@@ -1,0 +1,27 @@
+{
+  "root": false,
+  "extends": "//",
+  "linter": {
+    "domains": {
+      "react": "recommended"
+    },
+    "rules": {
+      "a11y": {
+        "preset": "recommended"
+      },
+      "style": {
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "patterns": [
+              {
+                "group": ["node:*", "@hub/core", "@hub/db"],
+                "message": "Browser code may only import browser-safe contracts."
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

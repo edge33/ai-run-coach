@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.turbo/
+coverage/
+.env
+.env.*
+!.env.example
+data/
+athlete_wiki/
+playwright-report/
+test-results/
+*.tsbuildinfo
+*.log
+.agents/
+.codex/

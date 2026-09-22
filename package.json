@@ -1,0 +1,38 @@
+{
+  "name": "running-data-hub",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "npm@11.19.0",
+  "engines": {
+    "node": ">=24.21.0 <25"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "check": "biome check . --error-on-warnings",
+    "check:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:e2e": "playwright test",
+    "migrate": "node --env-file-if-exists=.env apps/api/src/cli.ts migrate",
+    "sync": "node --env-file-if-exists=.env apps/api/src/cli.ts sync",
+    "backup": "node --env-file-if-exists=.env apps/api/src/cli.ts backup",
+    "restore": "node --env-file-if-exists=.env apps/api/src/cli.ts restore",
+    "export": "node --env-file-if-exists=.env apps/api/src/cli.ts export",
+    "mcp": "node --env-file-if-exists=.env apps/mcp/src/stdio.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.14",
+    "turbo": "2.11.2",
+    "typescript": "5.9.3",
+    "@types/node": "24.10.1",
+    "@playwright/test": "1.63.0"
+  }
+}

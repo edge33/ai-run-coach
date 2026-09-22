@@ -1,0 +1,14 @@
+.git
+.agents
+.codex
+**/node_modules
+**/dist
+**/.turbo
+**/coverage
+.env
+.env.*
+data
+athlete_wiki
+playwright-report
+test-results
+*.log
