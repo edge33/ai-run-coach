@@ -20,7 +20,6 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "test:e2e": "playwright test",
     "migrate": "node --env-file-if-exists=.env apps/api/src/cli.ts migrate",
     "sync": "node --env-file-if-exists=.env apps/api/src/cli.ts sync",
     "backup": "node --env-file-if-exists=.env apps/api/src/cli.ts backup",
@@ -30,9 +29,8 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",
-    "turbo": "2.11.2",
-    "typescript": "5.9.3",
     "@types/node": "24.10.1",
-    "@playwright/test": "1.63.0"
+    "turbo": "2.11.2",
+    "typescript": "5.9.3"
   }
 }
