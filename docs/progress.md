@@ -5,7 +5,9 @@ Last updated: 2026-09-23
 ## Current state
 
 - Active branch: `feature/native-type-stripping`, created from freshly fetched `origin/main`
-  (`c6abe26`). Prepared for a pull request targeting `main`; no merge has been performed.
+  (`c6abe26`). Pushed to `origin/feature/native-type-stripping`;
+  [PR #2](https://github.com/edge33/ai-run-coach/pull/2) targets `main`. No merge has been performed.
+  See the PR checks for the live CI status; validation below records the completed local checks.
 - API, MCP, and private libraries run TypeScript sources directly on Node 24.21.0. Only the web
   workspace has a build task. Library exports resolve through npm workspace symlinks to source
   outside `node_modules`; do not replace these with copied TypeScript packages in `node_modules`.
