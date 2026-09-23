@@ -1,0 +1,35 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "globalDependencies": ["biome.json", "packages/config/**", "package-lock.json"],
+  "globalPassThroughEnv": ["SMOKE_ORIGIN"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "dev": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "outputs": []
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "@hub/api#build": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "@hub/mcp#build": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "@hub/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome lint .",
+    "test": "node --test --test-isolation=none \"tests/*.test.ts\""
+  },
+  "dependencies": {
+    "@hub/contracts": "*",
+    "kysely": "0.29.6",
+    "better-sqlite3": "13.0.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "9.6.0"
+  }
+}
