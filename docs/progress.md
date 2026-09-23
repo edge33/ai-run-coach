@@ -5,8 +5,11 @@ Last updated: 2026-09-23
 ## Current state
 
 - Active branch: `refactor/readable-modules`, created from fetched `origin/main` (`9410b58`).
-  The user requested publishing this refactor as a new branch and PR against `main`; no merge
+  Published as [PR #4](https://github.com/edge33/ai-run-coach/pull/4) against `main`; no merge
   is authorized. The worktree was clean when the refactor began.
+- `git push -u origin refactor/readable-modules` and `gh pr create --base main --head
+  refactor/readable-modules ...` succeeded. GitHub CI is tracked on the PR; local validation
+  results below describe the completed refactor before publication.
 - Split database connection management, row types, migrations, and run/health/lease/sync repositories
   into focused modules while preserving the public Store API and all query/transaction bodies.
 - Split API routes by feature, extracted compressed snapshot storage from ingestion, and separated
