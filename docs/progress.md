@@ -4,11 +4,19 @@ Last updated: 2026-09-23
 
 ## Current state
 
-- Active branch: `feature/running-data-hub`.
-- The application and handoff documents are delivered together in the feature commit following the
-  empty baseline `81f550c`. Use `git log -1 --oneline` for the current checkpoint.
-- Pushed to `origin/feature/running-data-hub`; pull request
-  [#1](https://github.com/edge33/ai-run-coach/pull/1) targets `main`. No merge has been performed.
+- Active branch: `feature/native-type-stripping`, created from freshly fetched `origin/main`
+  (`c6abe26`). Pushed to `origin/feature/native-type-stripping`;
+  [PR #2](https://github.com/edge33/ai-run-coach/pull/2) targets `main`. No merge has been performed.
+  See the PR checks for the live CI status; validation below records the completed local checks.
+- API, MCP, and private libraries run TypeScript sources directly on Node 24.21.0. Only the web
+  workspace has a build task. Library exports resolve through npm workspace symlinks to source
+  outside `node_modules`; do not replace these with copied TypeScript packages in `node_modules`.
+- Removed library compiler/watch builds and build tsconfigs. The shared config enforces no emit,
+  erasable syntax, explicit TypeScript imports, and type-only imports.
+- Turbo uses a transitive dependency task to invalidate downstream caches when library sources
+  change, without compiling dependencies. API/MCP Node watchers follow imported library sources.
+- Docker has separate frontend-build and production-dependency stages; runtime ships library source.
+  CI runs type checking and tests before the frontend build to verify a build-free fresh checkout.
 
 ## Implemented
 
@@ -29,37 +37,39 @@ Last updated: 2026-09-23
 
 ## Validation results
 
-- `npm run check`, `npm run build`, `npm run typecheck`, and `npm run lint` all passed.
-- Core tests passed: date/DST behavior, idempotent imports, edits, partial failures, missing-versus-zero
-  summaries, retries, wiki confirmation, and backup/restore.
-- API tests passed after correcting host normalization and range parsing.
+Validated on 2026-09-23 with Node 24.21.0 and npm 11.19.0:
+
+- Removed `packages/{contracts,core,db}/dist` before validation; none was recreated.
+- `npm run typecheck` passed all six workspaces directly against source exports.
+- `npm run build` passed with exactly one executed build task: `@hub/web#build`.
+- `npm run check` and `npm run lint` passed.
 - `npm test` passed all 17 tests: database 3, core 7, API 1, MCP 3, and web 3.
-- MCP in-memory, Streamable HTTP, and native TypeScript stdio tests passed.
 - `npm run test:e2e` passed its Playwright dashboard test, including manual sync progress,
   deduplication, failure preservation, sparse data, and responsive layout.
-- Docker Engine 29.8.1 and Docker Compose 5.5.1 are now available and reachable.
-
-The suite was rerun on 2026-09-22 with host subprocess/browser access. The earlier stdio connection
-failure occurred only inside the restricted sandbox; no application fix was needed. A Biome warning
-was resolved by declaring `SMOKE_ORIGIN` in Turbo's environment configuration.
+- Source-resolution assertions using `import.meta.resolve('@hub/contracts')`, `@hub/core`, and
+  `@hub/db` resolved each package to `packages/<name>/src/index.ts` with no library `dist` present.
+- Compared `turbo run build typecheck test --dry=json` hashes before and after temporarily changing
+  contracts source: web build, API/MCP tests, and core typecheck hashes all changed. Source restored.
+- The initial sandbox run blocked Playwright's localhost listener (`EPERM`) and closed the stdio
+  subprocess connection. `npm test && npm run test:e2e` passed outside the sandbox without code fixes.
 
 ## Docker validation
 
-- Compose configuration, runtime/proxy image builds, migrations, and service health passed.
-- `nginx -t` and `scripts/compose-smoke.mjs` passed: SPA deep links, missing-asset/API 404s,
-  MCP initialization/list/call, and rejected untrusted origins through the proxy.
-- `scripts/compose-lifecycle.mjs` passed SSE progress/heartbeat streaming, SQLite and file persistence
-  across forced API/MCP/Nginx recreation, shared database visibility, SQLite integrity, and exactly
-  one published port (`127.0.0.1:8080`). Non-root container wiki writes and coordinated backup/restore
-  also passed, including restored SQLite integrity, usable leases, snapshots, and wiki files.
-- Container validation exposed and fixed a wiki-lock permissions issue: the lock now lives inside
-  the shared wiki volume and is excluded from backup archives. Build, typecheck, Biome/lint, affected
-  core/API/MCP tests, rebuilt containers, lifecycle tests, and proxy smoke checks passed afterward.
-  The backup regression test also verifies that a restored wiki can be updated immediately.
-- CI now includes the lifecycle script and uses the isolated validation project name.
-- Docker used its classic builder because the Buildx CLI plugin is absent; the build succeeded.
-- The disposable validation stack and synthetic-data volumes are removed with the teardown command
-  below. No production data was created or modified.
+- `TAILSCALE_IP=127.0.0.1 APP_ORIGINS=http://127.0.0.1:8080 INTERVALS_API_KEY='' docker compose
+  -p running-data-hub-validation up --build -d --wait` passed: runtime/proxy builds, migrations,
+  and all service health checks. Docker used its classic builder because Buildx is absent.
+- A Node assertion inside the API container verified that all three `@hub` libraries resolve to
+  `/app/packages/<name>/src/index.ts`, import successfully, and have no `dist` directory.
+- `TAILSCALE_IP=127.0.0.1 docker compose -p running-data-hub-validation exec nginx nginx -t`
+  and `node scripts/compose-smoke.mjs` passed: SPA deep links, missing-asset/API 404s, MCP
+  initialization/list/call, and rejected untrusted origins through the proxy.
+
+- `node scripts/compose-lifecycle.mjs` passed SSE progress/heartbeat streaming, persistence across
+  service recreation, shared SQLite, integrity, port isolation, and coordinated backup/restore.
+- `TAILSCALE_IP=127.0.0.1 docker compose -p running-data-hub-validation down -v` removed the
+  disposable validation stack and synthetic-data volumes. No athlete data was used.
+- Next recommended action: review the pull request and its CI results; all local implementation
+  checks passed.
 
 ## Environment-dependent follow-up
 
@@ -107,8 +117,8 @@ environments, Docker and subprocess/browser tests may require execution outside 
 ## Local operation
 
 Copy `.env.example` to `.env`, configure local paths/origins and optional Intervals credentials, then
-run `npm run build`, `npm run migrate`, and `npm run dev`. The web app runs on port 5173, the API on
-3000, and HTTP MCP on 3001. `npm run mcp` starts the stdio transport. The Synchronization view or
+run `npm run migrate` and `npm run dev` (no build prerequisite). The web app runs on port 5173, the API on
+3000, and HTTP MCP on 3001. `npm run build` produces only the frontend assets. `npm run mcp` starts the stdio transport. The Synchronization view or
 `npm run sync` explicitly starts an import; service startup does not.
 
 `npm run backup -- DESTINATION` creates a coordinated backup in a new empty directory.

@@ -28,9 +28,9 @@ athlete_wiki/   Local Markdown knowledge, excluded from Git
 data/           SQLite, snapshots, and backups, excluded from Git
 ```
 
-Run backend TypeScript directly on Node 24.21.0 using erasable syntax. Compile shared packages for
-workspace consumers, and let Vite build the browser app. Use Biome across all code workspaces and
-keep TypeScript checking as a separate gate.
+Run API, MCP, and shared-library TypeScript directly on Node 24.21.0 using erasable syntax.
+Private workspace packages export their `.ts` sources; only Vite builds the browser app. Use Biome
+across all code workspaces and keep TypeScript checking as a separate gate.
 
 ## Data and synchronization
 

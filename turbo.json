@@ -3,12 +3,14 @@
   "globalDependencies": ["biome.json", "packages/config/**", "package-lock.json"],
   "globalPassThroughEnv": ["SMOKE_ORIGIN"],
   "tasks": {
+    "transit": {
+      "dependsOn": ["^transit"]
+    },
     "build": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^transit"],
       "outputs": ["dist/**"]
     },
     "dev": {
-      "dependsOn": ["^build"],
       "cache": false,
       "persistent": true
     },
@@ -16,19 +18,11 @@
       "outputs": []
     },
     "typecheck": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^transit"],
       "outputs": []
     },
     "test": {
-      "dependsOn": ["^build"],
-      "outputs": []
-    },
-    "@hub/api#build": {
-      "dependsOn": ["^build"],
-      "outputs": []
-    },
-    "@hub/mcp#build": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^transit"],
       "outputs": []
     }
   }
