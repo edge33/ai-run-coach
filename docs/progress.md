@@ -4,8 +4,14 @@ Last updated: 2026-09-23
 
 ## Current state
 
-- Active branch: `chore/remove-e2e-tests`, created from freshly fetched `origin/main`
-  (`54da789`). PR publication is authorized; no merge has been performed.
+- Active branch: `refactor/readable-modules`, created from fetched `origin/main` (`9410b58`).
+  The user requested publishing this refactor as a new branch and PR against `main`; no merge
+  is authorized. The worktree was clean when the refactor began.
+- Split database connection management, row types, migrations, and run/health/lease/sync repositories
+  into focused modules while preserving the public Store API and all query/transaction bodies.
+- Split API routes by feature, extracted compressed snapshot storage from ingestion, and separated
+  the run-details screen and sync-progress hook from their parent UI files.
+- Added [code-map.md](code-map.md) to explain module responsibilities and review entry points.
 - Removed the Playwright browser suite, its synthetic server, configuration, npm script/dependency,
   and browser-install/test CI steps. Browser E2E coverage is deferred at the user's request.
   Unit, integration, MCP protocol, and Compose checks remain. Keep ignore rules for old local
@@ -39,18 +45,20 @@ Last updated: 2026-09-23
 
 ## Validation results
 
-Validated this removal on 2026-09-23 with Node 24.21.0 and npm 11.19.0:
+Validated this readability refactor on 2026-09-23 with Node 24.21.0 and npm 11.19.0:
 
-- `npm uninstall --package-lock-only --ignore-scripts --offline @playwright/test` passed;
-  the lockfile removes only Playwright packages and the root dependency.
-- `npm run check`, `npm run typecheck`, and `npm run lint` passed.
-- Initial sandbox `npm test` failed when the MCP stdio subprocess closed its connection;
-  Turbo then interrupted web tests. `npm test` outside the sandbox passed all 17 tests
-  (database 3, core 7, API 1 reused from that first run; MCP 3 and web 3 ran again).
+- `npm run check:fix` formatted the extracted modules; `npm run check` passed without warnings.
+- `npm run typecheck` and `npm run lint` passed across all workspaces.
+- Initial sandbox `npm test` passed database, core, and API tests, but the MCP stdio subprocess
+  closed its connection; Turbo then interrupted web tests. `npm test` outside the sandbox passed
+  all 17 tests (database 3, core 7, API 1, MCP 3, web 3), with no cached test results.
 - `npm run build` passed the frontend production build.
-- `git diff --check` passed. Compose checks were not rerun for this tooling-only removal.
+- Compared extracted database method bodies with `git show HEAD:packages/db/src/index.ts`, ignoring
+  whitespace: all matched. Public method signatures, arguments, defaults, and exports were reviewed.
+- `git diff --check` passed. Docker/Compose and browser checks were not rerun for this refactor;
+  browser E2E coverage remains deferred at the user's request.
 
-## Previous main-branch Docker validation (not rerun for this removal)
+## Previous main-branch Docker validation (not rerun for this refactor)
 
 - `TAILSCALE_IP=127.0.0.1 APP_ORIGINS=http://127.0.0.1:8080 INTERVALS_API_KEY='' docker compose
   -p running-data-hub-validation up --build -d --wait` passed: runtime/proxy builds, migrations,
@@ -65,7 +73,8 @@ Validated this removal on 2026-09-23 with Node 24.21.0 and npm 11.19.0:
   service recreation, shared SQLite, integrity, port isolation, and coordinated backup/restore.
 - `TAILSCALE_IP=127.0.0.1 docker compose -p running-data-hub-validation down -v` removed the
   disposable validation stack and synthetic-data volumes. No athlete data was used.
-- Next recommended action: review the removal PR and its CI results; local validation passed.
+- Next recommended action: review the refactor PR against `main` using `docs/code-map.md`
+  and its CI results. Local validation passed; the GitHub workflow also runs Compose checks.
 
 ## Environment-dependent follow-up
 

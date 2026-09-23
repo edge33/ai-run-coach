@@ -1,35 +1,20 @@
-import { syncRunSchema } from '@hub/contracts';
 import { useQueryClient } from '@tanstack/react-query';
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense } from 'react';
 import { Link, NavLink, Route, Routes } from 'react-router-dom';
 import { useStatus } from './api.ts';
 import { ErrorNotice } from './components.tsx';
 import { Overview } from './Overview.tsx';
-import { RunDetails, Runs } from './Runs.tsx';
+import { RunDetails } from './RunDetails.tsx';
+import { Runs } from './Runs.tsx';
 import { Synchronization } from './Synchronization.tsx';
+import { useSyncProgress } from './useSyncProgress.ts';
 
 const Health = lazy(() => import('./Health.tsx'));
 export function App() {
   const status = useStatus();
   const client = useQueryClient();
   const activeId = status.data?.active?.id;
-  const [streamError, setStreamError] = useState(false);
-  useEffect(() => {
-    if (!activeId) return;
-    const stream = new EventSource(`/api/sync-runs/${activeId}/events`);
-    stream.addEventListener('open', () => setStreamError(false));
-    stream.addEventListener('progress', (event) => {
-      const parsed = syncRunSchema.safeParse(JSON.parse((event as MessageEvent).data));
-      if (!parsed.success) return;
-      client.setQueryData(['active-sync'], parsed.data);
-      if (parsed.data.status !== 'running') {
-        stream.close();
-        void client.invalidateQueries();
-      }
-    });
-    stream.onerror = () => setStreamError(true);
-    return () => stream.close();
-  }, [activeId, client]);
+  const { streamError } = useSyncProgress(activeId);
   return (
     <div className="shell">
       <aside className="sidebar">
