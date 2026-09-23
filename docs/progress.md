@@ -1,13 +1,14 @@
 # Running Data Hub progress
 
-Last updated: 2026-09-22
+Last updated: 2026-09-23
 
 ## Current state
 
 - Active branch: `feature/running-data-hub`.
 - The application and handoff documents are delivered together in the feature commit following the
   empty baseline `81f550c`. Use `git log -1 --oneline` for the current checkpoint.
-- No push or merge has been performed.
+- Pushed to `origin/feature/running-data-hub`; pull request
+  [#1](https://github.com/edge33/ai-run-coach/pull/1) targets `main`. No merge has been performed.
 
 ## Implemented
 
@@ -66,7 +67,7 @@ was resolved by declaring `SMOKE_ORIGIN` in Turbo's environment configuration.
   responses; a real athlete import remains a deployment smoke check initiated by the user.
 - Tailscale exposure was validated with loopback substituted for the address. Access from another
   tailnet device remains a deployment check after configuring the real address and matching origin.
-- No production deployment, push, or merge has been performed.
+- No production deployment or merge has been performed.
 
 ## Resume commands
 
