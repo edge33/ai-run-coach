@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "node --env-file-if-exists=../../.env --watch src/http.ts",
     "start": "node src/http.ts",
-    "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "lint": "biome lint .",
     "test": "node --test --test-isolation=none \"tests/*.test.ts\""
