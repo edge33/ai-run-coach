@@ -15,6 +15,9 @@ Last updated: 2026-09-23
 - Split API routes by feature, extracted compressed snapshot storage from ingestion, and separated
   the run-details screen and sync-progress hook from their parent UI files.
 - Added [code-map.md](code-map.md) to explain module responsibilities and review entry points.
+- Registered the local stdio MCP server in this workstation's Codex configuration as
+  `running_data_hub`, using Node 24.21.0, the repository `.env`, and `apps/mcp/src/stdio.ts`.
+  This personal Codex configuration is outside Git.
 - Removed the Playwright browser suite, its synthetic server, configuration, npm script/dependency,
   and browser-install/test CI steps. Browser E2E coverage is deferred at the user's request.
   Unit, integration, MCP protocol, and Compose checks remain. Keep ignore rules for old local
@@ -60,6 +63,11 @@ Validated this readability refactor on 2026-09-23 with Node 24.21.0 and npm 11.1
   whitespace: all matched. Public method signatures, arguments, defaults, and exports were reviewed.
 - `git diff --check` passed. Docker/Compose and browser checks were not rerun for this refactor;
   browser E2E coverage remains deferred at the user's request.
+
+- `codex mcp get running_data_hub --json` reported an enabled stdio connection. A direct MCP
+  client connection outside the sandbox listed all 11 tools and successfully called
+  `get_athlete_context`. The initial sandbox subprocess attempt closed its connection,
+  matching the earlier MCP protocol test limitation. Start a new Codex session to load the server.
 
 ## Previous main-branch Docker validation (not rerun for this refactor)
 
@@ -125,7 +133,9 @@ tests may require execution outside the sandbox.
 
 Copy `.env.example` to `.env`, configure local paths/origins and optional Intervals credentials, then
 run `npm run migrate` and `npm run dev` (no build prerequisite). The web app runs on port 5173, the API on
-3000, and HTTP MCP on 3001. `npm run build` produces only the frontend assets. `npm run mcp` starts the stdio transport. The Synchronization view or
+3000, and HTTP MCP on 3001. `npm run build` produces only the frontend assets. `npm run mcp` starts the stdio transport. On this workstation, Codex starts it through the
+registered `running_data_hub` MCP server; a new Codex session is needed after registration.
+The Synchronization view or
 `npm run sync` explicitly starts an import; service startup does not.
 
 `npm run backup -- DESTINATION` creates a coordinated backup in a new empty directory.
