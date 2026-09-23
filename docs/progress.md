@@ -4,10 +4,12 @@ Last updated: 2026-09-23
 
 ## Current state
 
-- Active branch: `feature/native-type-stripping`, created from freshly fetched `origin/main`
-  (`c6abe26`). Pushed to `origin/feature/native-type-stripping`;
-  [PR #2](https://github.com/edge33/ai-run-coach/pull/2) targets `main`. No merge has been performed.
-  See the PR checks for the live CI status; validation below records the completed local checks.
+- Active branch: `chore/remove-e2e-tests`, created from freshly fetched `origin/main`
+  (`54da789`). PR publication is authorized; no merge has been performed.
+- Removed the Playwright browser suite, its synthetic server, configuration, npm script/dependency,
+  and browser-install/test CI steps. Browser E2E coverage is deferred at the user's request.
+  Unit, integration, MCP protocol, and Compose checks remain. Keep ignore rules for old local
+  browser reports so generated artifacts cannot enter Git or Docker image layers.
 - API, MCP, and private libraries run TypeScript sources directly on Node 24.21.0. Only the web
   workspace has a build task. Library exports resolve through npm workspace symlinks to source
   outside `node_modules`; do not replace these with copied TypeScript packages in `node_modules`.
@@ -33,27 +35,22 @@ Last updated: 2026-09-23
 - Eleven semantic MCP tools shared by stdio and stateless Streamable HTTP transports.
 - Coordinated SQLite/wiki/snapshot backup, restore, and export commands.
 - Multi-stage Dockerfile, SQLite-only Compose services, Nginx reverse proxy, health checks, CI, unit,
-  integration, protocol, browser, and Compose smoke tests.
+  integration, protocol, and Compose smoke tests.
 
 ## Validation results
 
-Validated on 2026-09-23 with Node 24.21.0 and npm 11.19.0:
+Validated this removal on 2026-09-23 with Node 24.21.0 and npm 11.19.0:
 
-- Removed `packages/{contracts,core,db}/dist` before validation; none was recreated.
-- `npm run typecheck` passed all six workspaces directly against source exports.
-- `npm run build` passed with exactly one executed build task: `@hub/web#build`.
-- `npm run check` and `npm run lint` passed.
-- `npm test` passed all 17 tests: database 3, core 7, API 1, MCP 3, and web 3.
-- `npm run test:e2e` passed its Playwright dashboard test, including manual sync progress,
-  deduplication, failure preservation, sparse data, and responsive layout.
-- Source-resolution assertions using `import.meta.resolve('@hub/contracts')`, `@hub/core`, and
-  `@hub/db` resolved each package to `packages/<name>/src/index.ts` with no library `dist` present.
-- Compared `turbo run build typecheck test --dry=json` hashes before and after temporarily changing
-  contracts source: web build, API/MCP tests, and core typecheck hashes all changed. Source restored.
-- The initial sandbox run blocked Playwright's localhost listener (`EPERM`) and closed the stdio
-  subprocess connection. `npm test && npm run test:e2e` passed outside the sandbox without code fixes.
+- `npm uninstall --package-lock-only --ignore-scripts --offline @playwright/test` passed;
+  the lockfile removes only Playwright packages and the root dependency.
+- `npm run check`, `npm run typecheck`, and `npm run lint` passed.
+- Initial sandbox `npm test` failed when the MCP stdio subprocess closed its connection;
+  Turbo then interrupted web tests. `npm test` outside the sandbox passed all 17 tests
+  (database 3, core 7, API 1 reused from that first run; MCP 3 and web 3 ran again).
+- `npm run build` passed the frontend production build.
+- `git diff --check` passed. Compose checks were not rerun for this tooling-only removal.
 
-## Docker validation
+## Previous main-branch Docker validation (not rerun for this removal)
 
 - `TAILSCALE_IP=127.0.0.1 APP_ORIGINS=http://127.0.0.1:8080 INTERVALS_API_KEY='' docker compose
   -p running-data-hub-validation up --build -d --wait` passed: runtime/proxy builds, migrations,
@@ -68,8 +65,7 @@ Validated on 2026-09-23 with Node 24.21.0 and npm 11.19.0:
   service recreation, shared SQLite, integrity, port isolation, and coordinated backup/restore.
 - `TAILSCALE_IP=127.0.0.1 docker compose -p running-data-hub-validation down -v` removed the
   disposable validation stack and synthetic-data volumes. No athlete data was used.
-- Next recommended action: review the pull request and its CI results; all local implementation
-  checks passed.
+- Next recommended action: review the removal PR and its CI results; local validation passed.
 
 ## Environment-dependent follow-up
 
@@ -81,8 +77,8 @@ Validated on 2026-09-23 with Node 24.21.0 and npm 11.19.0:
 
 ## Resume commands
 
-Use Node 24.21.0 and npm 11.19.0. On a fresh checkout run `npm ci` and
-`npx playwright install --with-deps chromium` first. Run from the repository root:
+Use Node 24.21.0 and npm 11.19.0. On a fresh checkout run `npm ci` first.
+Run from the repository root:
 
 ```bash
 git status --short
@@ -94,7 +90,6 @@ npm run build
 npm run typecheck
 npm run lint
 npm test
-npm run test:e2e
 
 export TAILSCALE_IP=127.0.0.1 APP_ORIGINS=http://127.0.0.1:8080 INTERVALS_API_KEY=''
 docker compose -p running-data-hub-validation config --quiet
@@ -111,8 +106,8 @@ Use `127.0.0.1` only for local validation. Homelab deployment must set `TAILSCAL
 actual Tailscale address and set `APP_ORIGINS` to the matching externally used origin.
 The lifecycle script requires fresh disposable validation volumes and seeds synthetic fixtures.
 The final `down -v` deletes only that validation project's volumes; never use it against athlete data.
-Docker daemon access and the Playwright browser installation must be available. In restricted agent
-environments, Docker and subprocess/browser tests may require execution outside the sandbox.
+Docker daemon access must be available. In restricted agent environments, Docker and subprocess
+tests may require execution outside the sandbox.
 
 ## Local operation
 

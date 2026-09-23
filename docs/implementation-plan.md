@@ -107,7 +107,7 @@ after restore, and verify database integrity.
 
 ## Acceptance
 
-- Biome, build, typecheck, unit/integration tests, MCP protocol tests, and Playwright pass.
+- Biome, build, typecheck, unit/integration tests, and MCP protocol tests pass.
 - Repeated syncs are idempotent, edits are captured, failures preserve prior data, and reads never sync.
 - Stdio and HTTP MCP expose equivalent bounded tools without protocol contamination.
 - Compose builds and starts; migrations complete; API/MCP/Nginx health checks pass.
