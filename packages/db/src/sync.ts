@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { Coverage, DateRange, SyncRun } from '@hub/contracts';
 import type { Kysely } from 'kysely';
 import { mergeRanges } from './ranges.ts';
-import type { Database, Snapshot } from './schema.ts';
+import type { Database } from './schema.ts';
 
 export class SyncRepository {
   private readonly db: Kysely<Database>;
@@ -103,9 +103,5 @@ export class SyncRepository {
       .where('sync_id', '=', syncId)
       .limit(100)
       .execute();
-  }
-
-  async snapshot(row: Snapshot) {
-    await this.db.insertInto('snapshots').values(row).execute();
   }
 }

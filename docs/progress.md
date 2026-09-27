@@ -1,8 +1,32 @@
 # Running Data Hub progress
 
-Last updated: 2026-09-23
+Last updated: 2026-09-27
 
-## Current state
+## Minimal data model implementation
+
+- Branch: `feature/minimal-data-model`, based on fetched `origin/main` at `9b3aeb5`.
+  Draft [PR #5](https://github.com/edge33/ai-run-coach/pull/5) remains open; no merge was performed.
+- The fresh SQLite migration now uses `STRICT` domain tables. Repository writes parse the shared
+  Zod contracts, and run date queries include the maximum valid date. Source IDs, wellness rows,
+  ordered intervals, nullable measurements, and same-day form follow the approved tracker.
+- Manual sync retains only normalized fields, handles detail failure without deleting intervals,
+  and does not run on reads. API, MCP, web, summaries, export, Compose, and lifecycle checks use the
+  new model. Snapshot and backup/restore functionality and configuration have been removed.
+- `npm run check`, `npm run typecheck`, `npm run lint`, `npm test` (outside the sandbox for the MCP
+  stdio subprocess), and `npm run build` pass locally. Database, core, API, MCP, and web tests pass.
+  A sandbox-only `npm test` attempt closed the MCP stdio connection; the same suite passed outside.
+- The disposable `running-data-hub-validation` Compose project passed `config --quiet`,
+  `up --build -d --wait`, `nginx -t`, `scripts/compose-smoke.mjs`, and
+  `scripts/compose-lifecycle.mjs` with synthetic data. `down -v` removed only its volumes.
+- Both application jobs on draft PR #5 passed the complete GitHub workflow, including Compose.
+- Upstream field evidence is recorded in the tracker. The official forum model supports wellness
+  keys, activity speeds, and interval `max_watts`; run maximum power and elevation loss remain null
+  because a supported source key was not confirmed. A live credential-backed import has not run.
+- Next action: finish source-key verification if current official OpenAPI access becomes available,
+  then complete remaining mapping/log-discard test coverage. The one-time athlete-data reset and explicit historical import remain
+  pending; do not infer a historical range from `all` on an empty database.
+
+## Pre-redesign state (historical)
 
 - Active branch: `refactor/readable-modules`, created from fetched `origin/main` (`9410b58`).
   Published as [PR #4](https://github.com/edge33/ai-run-coach/pull/4) against `main`; no merge
@@ -84,8 +108,8 @@ Validated this readability refactor on 2026-09-23 with Node 24.21.0 and npm 11.1
   service recreation, shared SQLite, integrity, port isolation, and coordinated backup/restore.
 - `TAILSCALE_IP=127.0.0.1 docker compose -p running-data-hub-validation down -v` removed the
   disposable validation stack and synthetic-data volumes. No athlete data was used.
-- Next recommended action: review the refactor PR against `main` using `docs/code-map.md`
-  and its CI results. Local validation passed; the GitHub workflow also runs Compose checks.
+- Previous recommendation was to review the refactor PR against `main`; the current next action
+  is the minimal-model tracker above. No push or merge is authorized by this documentation task.
 
 ## Environment-dependent follow-up
 
@@ -138,10 +162,9 @@ registered `running_data_hub` MCP server; a new Codex session is needed after re
 The Synchronization view or
 `npm run sync` explicitly starts an import; service startup does not.
 
-`npm run backup -- DESTINATION` creates a coordinated backup in a new empty directory.
-`npm run restore -- BACKUP_DIR EMPTY_DESTINATION` verifies and restores it. Point `SQLITE_PATH`,
-`SNAPSHOT_PATH`, and `WIKI_PATH` to the restored `coach.sqlite`, `snapshots`, and `wiki` respectively.
-For Compose backups, run a helper with all three volumes mounted: API alone has no wiki mount.
+`npm run export -- DESTINATION` writes normalized JSON records into a new empty directory.
+The legacy backup and restore commands have been removed. The deployment reset remains a separate,
+one-time action in the minimal-model tracker.
 The lifecycle script demonstrates that helper and verifies restoration without touching host data.
 
 ## Update discipline

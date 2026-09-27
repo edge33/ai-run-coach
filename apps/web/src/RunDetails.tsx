@@ -30,12 +30,11 @@ export function RunDetails() {
         <>
           <div className="page-heading">
             <div>
-              <p className="eyebrow">
-                {run.local_date} · {run.sport}
-              </p>
-              <h1>{run.name}</h1>
+              <p className="eyebrow">{run.start_time.slice(0, 10)}</p>
+              <h1>Run on {run.start_time.slice(0, 10)}</h1>
               <p>
-                {run.start_local.replace('T', ' ')} · {run.timezone}
+                {run.start_time.replace('T', ' ')}
+                {run.indoor === null ? '' : run.indoor ? ' · Indoor' : ' · Outdoor'}
               </p>
             </div>
           </div>
@@ -89,16 +88,16 @@ export function RunDetails() {
                       <tr>
                         <th>Interval</th>
                         <th>Distance</th>
-                        <th>Moving time</th>
+                        <th>Duration</th>
                         <th>Avg. HR</th>
                       </tr>
                     </thead>
                     <tbody>
                       {query.data.intervals.map((interval) => (
-                        <tr key={interval.interval_index}>
-                          <td>{interval.label ?? `Interval ${interval.interval_index + 1}`}</td>
+                        <tr key={interval.sequence}>
+                          <td>{interval.interval_type ?? `Interval ${interval.sequence + 1}`}</td>
                           <td>{number(interval.distance_m)} m</td>
-                          <td>{number(interval.moving_time_s)} s</td>
+                          <td>{number(interval.duration_s)} s</td>
                           <td>{number(interval.avg_hr_bpm)} bpm</td>
                         </tr>
                       ))}
@@ -117,7 +116,7 @@ export function RunDetails() {
             )}
           </section>
           <p className="provenance">
-            Source activity {run.external_id} · Imported {run.synced_at} · Evidence {run.id}
+            Source activity {run.id} · Imported {run.synced_at}
           </p>
         </>
       ) : query.isPending ? (

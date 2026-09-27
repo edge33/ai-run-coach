@@ -1,4 +1,4 @@
-import { healthQuerySchema, healthValueSchema, validateRange } from '@hub/contracts';
+import { healthQuerySchema, validateRange, wellnessSchema } from '@hub/contracts';
 import type { Store } from '@hub/db';
 import type { FastifyInstance } from 'fastify';
 import { jsonSchema, pageResult, response } from './schemas.ts';
@@ -9,13 +9,13 @@ export function registerHealthRoutes(routes: FastifyInstance, store: Store) {
     {
       schema: {
         querystring: jsonSchema(healthQuerySchema),
-        response: response(pageResult(healthValueSchema)),
+        response: response(pageResult(wellnessSchema)),
       },
     },
     async (request) => {
       const query = healthQuerySchema.parse(request.query);
       validateRange(query);
-      return store.listHealth(query, query.metric, query.limit, query.offset);
+      return store.listWellness(query, query.limit, query.offset);
     },
   );
 }

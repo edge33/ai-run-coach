@@ -7,6 +7,13 @@ export const dateSchema = z
     const parsed = new Date(`${value}T00:00:00Z`);
     return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
   }, 'Use a valid YYYY-MM-DD date');
+export const localTimestampSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/)
+  .refine((value) => {
+    const parsed = new Date(`${value}Z`);
+    return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 19) === value;
+  }, 'Use a valid local timestamp');
 export const rangeSchema = z.object({ start: dateSchema, end: dateSchema }).strict();
 export type DateRange = z.infer<typeof rangeSchema>;
 export const pageSchema = rangeSchema.extend({
@@ -20,76 +27,70 @@ export const syncRequestSchema = z.discriminatedUnion('mode', [
 ]);
 export type SyncRequest = z.infer<typeof syncRequestSchema>;
 export const healthMetrics = {
-  resting_hr: { field: 'restingHR', unit: 'bpm', definition: 'Resting heart rate' },
-  hrv: {
-    field: 'hrv',
-    unit: 'ms',
-    definition: 'Intervals.icu hrv; source metric, not mixed with SDNN',
-  },
-  hrv_sdnn: { field: 'hrvSDNN', unit: 'ms', definition: 'Heart rate variability SDNN' },
-  sleep: { field: 'sleepSecs', unit: 's', definition: 'Recorded sleep duration' },
-  sleep_quality: {
-    field: 'sleepQuality',
-    unit: 'source_score',
-    definition: 'Source sleep quality score',
-  },
-  weight: { field: 'weight', unit: 'kg', definition: 'Body weight' },
-  steps: { field: 'steps', unit: 'count', definition: 'Daily recorded steps' },
-  fatigue: { field: 'fatigue', unit: 'source_score', definition: 'Self-reported fatigue' },
-  soreness: { field: 'soreness', unit: 'source_score', definition: 'Self-reported soreness' },
-  mood: { field: 'mood', unit: 'source_score', definition: 'Self-reported mood' },
-  stress: { field: 'stress', unit: 'source_score', definition: 'Self-reported stress' },
+  resting_hr_bpm: { field: 'restingHR', unit: 'bpm', definition: 'Resting heart rate' },
+  hrv_ms: { field: 'hrv', unit: 'ms', definition: 'Heart rate variability' },
+  sleep_duration_s: { field: 'sleepSecs', unit: 's', definition: 'Sleep duration' },
+  weight_kg: { field: 'weight', unit: 'kg', definition: 'Body weight' },
+  fitness_ctl: { field: 'ctl', unit: 'load', definition: 'Chronic training load' },
+  fatigue_atl: { field: 'atl', unit: 'load', definition: 'Acute training load' },
+  form_tsb: { field: 'ctl - atl', unit: 'load', definition: 'Same-day fitness minus fatigue' },
+  training_load: { field: 'ctlLoad', unit: 'load', definition: 'Daily training load' },
 } as const;
 export type HealthMetric = keyof typeof healthMetrics;
 export const metricSchema = z.enum(Object.keys(healthMetrics) as [HealthMetric, ...HealthMetric[]]);
-export const healthQuerySchema = pageSchema.extend({ metric: metricSchema.default('resting_hr') });
+export const healthQuerySchema = pageSchema;
 const measurement = z.number().finite().nonnegative().nullable();
 export const runSchema = z.object({
-  id: z.string(),
-  external_id: z.string(),
-  name: z.string(),
-  sport: z.string(),
-  start_utc: z.string().nullable(),
-  start_local: z.string(),
-  local_date: z.string(),
-  timezone: z.string(),
+  id: z.string().min(1).max(200),
+  start_time: localTimestampSchema,
   indoor: z.number().int().min(0).max(1).nullable(),
   distance_m: measurement,
+  duration_s: measurement,
   moving_time_s: measurement,
-  elapsed_time_s: measurement,
-  elevation_m: measurement,
+  avg_speed_mps: measurement,
+  max_speed_mps: measurement,
   avg_hr_bpm: measurement,
   max_hr_bpm: measurement,
-  avg_cadence: measurement,
   avg_power_w: measurement,
+  max_power_w: measurement,
+  elevation_gain_m: measurement,
+  elevation_loss_m: measurement,
+  avg_cadence_rpm: measurement,
   training_load: measurement,
-  source_hash: z.string(),
-  snapshot_id: z.string(),
   synced_at: z.string(),
   details_status: z.enum(['complete', 'unavailable']),
 });
 export type Run = z.infer<typeof runSchema>;
 export const intervalSchema = z.object({
-  run_id: z.string(),
-  interval_index: z.number().int(),
-  label: z.string().nullable(),
+  run_id: z.string().min(1).max(200),
+  sequence: z.number().int().nonnegative(),
+  interval_type: z.string().nullable(),
+  duration_s: measurement,
   distance_m: measurement,
-  moving_time_s: measurement,
-  elapsed_time_s: measurement,
+  avg_speed_mps: measurement,
+  max_speed_mps: measurement,
   avg_hr_bpm: measurement,
+  max_hr_bpm: measurement,
   avg_power_w: measurement,
+  max_power_w: measurement,
+  elevation_gain_m: measurement,
+  elevation_loss_m: measurement,
+  avg_cadence_rpm: measurement,
 });
 export type RunInterval = z.infer<typeof intervalSchema>;
-export const healthValueSchema = z.object({
-  local_date: z.string(),
-  metric: metricSchema,
-  value: measurement,
-  unit: z.string(),
-  definition: z.string(),
+export const wellnessSchema = z.object({
+  date: dateSchema,
+  resting_hr_bpm: measurement,
+  hrv_ms: measurement,
+  sleep_duration_s: measurement,
+  weight_kg: measurement,
+  fitness_ctl: measurement,
+  fatigue_atl: measurement,
+  form_tsb: z.number().finite().nullable(),
+  training_load: measurement,
   synced_at: z.string(),
-  snapshot_id: z.string(),
 });
-export type HealthValue = z.infer<typeof healthValueSchema>;
+export type Wellness = z.infer<typeof wellnessSchema>;
 export const syncRunSchema = z.object({
   id: z.string(),
   mode: z.enum(['recent', 'range', 'all']),

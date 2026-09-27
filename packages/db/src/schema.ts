@@ -1,26 +1,9 @@
-import type { Coverage, HealthValue, Run, RunInterval, SyncRun } from '@hub/contracts';
+import type { Coverage, Run, RunInterval, SyncRun, Wellness } from '@hub/contracts';
 
-export interface RunRow extends Run {
-  source_json: string;
-}
-export interface IntervalRow extends RunInterval {
-  source_json: string;
-}
-export interface HealthDay {
-  local_date: string;
-  source_json: string;
-  source_hash: string;
-  synced_at: string;
-  snapshot_id: string;
-}
-export interface Snapshot {
-  id: string;
-  sync_id: string;
-  resource: string;
-  path: string;
-  hash: string;
-  created_at: string;
-}
+export type RunRow = Run;
+export type IntervalRow = RunInterval;
+export type WellnessRow = Wellness;
+
 interface SyncIssue {
   id: string;
   sync_id: string;
@@ -36,11 +19,9 @@ interface Lease {
 export interface Database {
   runs: RunRow;
   run_intervals: IntervalRow;
-  health_days: HealthDay;
-  health_values: HealthValue;
+  wellness: WellnessRow;
   sync_runs: SyncRun;
   coverage: Coverage;
-  snapshots: Snapshot;
   sync_issues: SyncIssue;
   leases: Lease;
 }

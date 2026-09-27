@@ -68,7 +68,7 @@ export function Overview() {
         <article className="stat">
           <span>Elevation gained</span>
           <strong>
-            {number(values?.elevation_m?.value)}
+            {number(values?.elevation_gain_m?.value)}
             <small> m</small>
           </strong>
           <p>Recorded climbing</p>
@@ -96,9 +96,9 @@ export function Overview() {
                     ↗
                   </span>
                   <span>
-                    <strong>{run.name}</strong>
+                    <strong>{run.start_time.replace('T', ' ')}</strong>
                     <small>
-                      {run.local_date} · {run.sport}
+                      {run.indoor === null ? 'Run' : run.indoor ? 'Indoor run' : 'Outdoor run'}
                     </small>
                   </span>
                   <span className="run-distance">

@@ -1,135 +1,123 @@
-import { createHash, randomUUID } from 'node:crypto';
-import { dateSchema, type HealthMetric, type HealthValue, healthMetrics } from '@hub/contracts';
-import type { IntervalRow, RunRow } from '@hub/db';
+import { createHash } from 'node:crypto';
+import {
+  dateSchema,
+  intervalSchema,
+  localTimestampSchema,
+  runSchema,
+  wellnessSchema,
+} from '@hub/contracts';
 import { z } from 'zod';
 
-const n = z.number().finite().nonnegative().nullish();
-const text = z.string().nullish();
-export const activitySchema = z
-  .object({
-    id: z.string().min(1).max(200),
-    type: z.string(),
-    start_date_local: z.string(),
-    start_date: text,
-    timezone: text,
-    name: text,
-    trainer: z.boolean().nullish(),
-    distance: n,
-    moving_time: n,
-    elapsed_time: n,
-    total_elevation_gain: n,
-    average_heartrate: n,
-    max_heartrate: n,
-    average_cadence: n,
-    icu_average_watts: n,
-    icu_training_load: n,
-  })
-  .passthrough();
-export const intervalSourceSchema = z
-  .object({
-    label: text,
-    distance: n,
-    moving_time: n,
-    elapsed_time: n,
-    average_heartrate: n,
-    average_watts: n,
-  })
-  .passthrough();
-export const wellnessSchema = z
-  .object({
-    id: dateSchema,
-    ...Object.fromEntries(Object.values(healthMetrics).map((m) => [m.field, n])),
-  })
-  .passthrough();
+const measurement = z.number().finite().nonnegative().nullish();
+export const intervalSourceSchema = z.object({
+  type: z.string().nullish(),
+  elapsed_time: measurement,
+  distance: measurement,
+  average_speed: measurement,
+  max_speed: measurement,
+  average_heartrate: measurement,
+  max_heartrate: measurement,
+  average_watts: measurement,
+  max_watts: measurement,
+  total_elevation_gain: measurement,
+  average_cadence: measurement,
+});
+export const activitySchema = z.object({
+  id: z.string().min(1).max(200),
+  type: z.string(),
+  start_date_local: localTimestampSchema,
+  trainer: z.boolean().nullish(),
+  distance: measurement,
+  elapsed_time: measurement,
+  moving_time: measurement,
+  average_speed: measurement,
+  max_speed: measurement,
+  average_heartrate: measurement,
+  max_heartrate: measurement,
+  icu_average_watts: measurement,
+  total_elevation_gain: measurement,
+  average_cadence: measurement,
+  icu_training_load: measurement,
+  icu_intervals: z.array(intervalSourceSchema).max(10000).optional(),
+});
+export const wellnessSourceSchema = z.object({
+  id: dateSchema,
+  restingHR: measurement,
+  hrv: measurement,
+  sleepSecs: measurement,
+  weight: measurement,
+  ctl: measurement,
+  atl: measurement,
+  ctlLoad: measurement,
+});
 export const runningTypes = new Set(['Run', 'TrailRun', 'VirtualRun']);
 export function hash(value: unknown) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
-export function mapActivity(
-  source: unknown,
-  snapshotId: string,
-  timezone: string,
-  details: boolean,
-) {
+
+export function mapActivity(source: unknown, details: boolean) {
   const value = activitySchema.parse(source);
   if (!runningTypes.has(value.type)) throw new Error('NOT_RUNNING');
-  if (
-    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(value.start_date_local) ||
-    !Number.isFinite(Date.parse(`${value.start_date_local}Z`))
-  )
-    throw new Error('INVALID_LOCAL_TIME');
-  const localDate = dateSchema.parse(value.start_date_local.slice(0, 10));
-  // Never infer UTC from an ambiguous local timestamp. An upstream offset/Z is required.
-  const utc =
-    value.start_date &&
-    /(?:Z|[+-]\d{2}:?\d{2})$/.test(value.start_date) &&
-    Number.isFinite(Date.parse(value.start_date))
-      ? new Date(value.start_date).toISOString()
-      : null;
-  const id = randomUUID();
-  const run: RunRow = {
-    id,
-    external_id: value.id,
-    name: value.name ?? 'Untitled run',
-    sport: value.type,
-    start_utc: utc,
-    start_local: value.start_date_local,
-    local_date: localDate,
-    timezone: value.timezone ?? timezone,
+  dateSchema.parse(value.start_date_local.slice(0, 10));
+  const run = runSchema.parse({
+    id: value.id,
+    start_time: value.start_date_local,
     indoor: value.trainer == null ? null : Number(value.trainer),
     distance_m: value.distance ?? null,
+    duration_s: value.elapsed_time ?? null,
     moving_time_s: value.moving_time ?? null,
-    elapsed_time_s: value.elapsed_time ?? null,
-    elevation_m: value.total_elevation_gain ?? null,
+    avg_speed_mps: value.average_speed ?? null,
+    max_speed_mps: value.max_speed ?? null,
     avg_hr_bpm: value.average_heartrate ?? null,
     max_hr_bpm: value.max_heartrate ?? null,
-    avg_cadence: value.average_cadence ?? null,
     avg_power_w: value.icu_average_watts ?? null,
+    max_power_w: null,
+    elevation_gain_m: value.total_elevation_gain ?? null,
+    elevation_loss_m: null,
+    avg_cadence_rpm: value.average_cadence ?? null,
     training_load: value.icu_training_load ?? null,
-    source_hash: hash(source),
-    snapshot_id: snapshotId,
     synced_at: new Date().toISOString(),
     details_status: details ? 'complete' : 'unavailable',
-    source_json: JSON.stringify(source),
-  };
-  let intervals: IntervalRow[] | null = null;
-  if (details) {
-    const raw = z
-      .array(intervalSourceSchema)
-      .max(10000)
-      .parse(value.icu_intervals ?? []);
-    intervals = raw.map((interval, index) => ({
-      run_id: id,
-      interval_index: index,
-      label: interval.label ?? null,
-      distance_m: interval.distance ?? null,
-      moving_time_s: interval.moving_time ?? null,
-      elapsed_time_s: interval.elapsed_time ?? null,
-      avg_hr_bpm: interval.average_heartrate ?? null,
-      avg_power_w: interval.average_watts ?? null,
-      source_json: JSON.stringify(interval),
-    }));
-  }
+  });
+  const intervals = details
+    ? z
+        .array(intervalSourceSchema)
+        .max(10000)
+        .parse(value.icu_intervals)
+        .map((interval, sequence) =>
+          intervalSchema.parse({
+            run_id: run.id,
+            sequence,
+            interval_type: interval.type ?? null,
+            duration_s: interval.elapsed_time ?? null,
+            distance_m: interval.distance ?? null,
+            avg_speed_mps: interval.average_speed ?? null,
+            max_speed_mps: interval.max_speed ?? null,
+            avg_hr_bpm: interval.average_heartrate ?? null,
+            max_hr_bpm: interval.max_heartrate ?? null,
+            avg_power_w: interval.average_watts ?? null,
+            max_power_w: interval.max_watts ?? null,
+            elevation_gain_m: interval.total_elevation_gain ?? null,
+            elevation_loss_m: null,
+            avg_cadence_rpm: interval.average_cadence ?? null,
+          }),
+        )
+    : null;
   return { run, intervals };
 }
-export function mapWellness(source: unknown, snapshotId: string) {
-  const value = wellnessSchema.parse(source);
-  const syncedAt = new Date().toISOString();
-  const day = {
-    local_date: value.id,
-    source_json: JSON.stringify(source),
-    source_hash: hash(source),
-    synced_at: syncedAt,
-    snapshot_id: snapshotId,
-  };
-  const values: HealthValue[] = Object.entries(healthMetrics).map(([metric, meta]) => ({
-    local_date: value.id,
-    metric: metric as HealthMetric,
-    value: (value[meta.field] as number | null | undefined) ?? null,
-    unit: meta.unit,
-    definition: meta.definition,
-    synced_at: syncedAt,
-    snapshot_id: snapshotId,
-  }));
-  return { day, values };
+
+export function mapWellness(source: unknown) {
+  const value = wellnessSourceSchema.parse(source);
+  return wellnessSchema.parse({
+    date: value.id,
+    resting_hr_bpm: value.restingHR ?? null,
+    hrv_ms: value.hrv ?? null,
+    sleep_duration_s: value.sleepSecs ?? null,
+    weight_kg: value.weight ?? null,
+    fitness_ctl: value.ctl ?? null,
+    fatigue_atl: value.atl ?? null,
+    form_tsb: value.ctl == null || value.atl == null ? null : value.ctl - value.atl,
+    training_load: value.ctlLoad ?? null,
+    synced_at: new Date().toISOString(),
+  });
 }

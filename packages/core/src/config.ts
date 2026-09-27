@@ -4,7 +4,6 @@ import pino from 'pino';
 
 export interface Config {
   databasePath: string;
-  snapshotPath: string;
   wikiPath: string;
   timezone: string;
   apiKey: string;
@@ -24,7 +23,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     .map((s) => new URL(s.trim()).origin);
   return {
     databasePath: resolve(root, env.SQLITE_PATH ?? 'data/db/coach.sqlite'),
-    snapshotPath: resolve(root, env.SNAPSHOT_PATH ?? 'data/snapshots'),
     wikiPath: resolve(root, env.WIKI_PATH ?? 'athlete_wiki'),
     timezone,
     apiKey: env.INTERVALS_API_KEY ?? '',

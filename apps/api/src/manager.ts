@@ -24,7 +24,6 @@ export class SyncManager {
         env: {
           ...process.env,
           SQLITE_PATH: this.config.databasePath,
-          SNAPSHOT_PATH: this.config.snapshotPath,
           ATHLETE_TIMEZONE: this.config.timezone,
           INTERVALS_API_KEY: this.config.apiKey,
           INTERVALS_ATHLETE_ID: this.config.athleteId,

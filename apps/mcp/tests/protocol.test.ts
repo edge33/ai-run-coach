@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
-import { loadConfig } from '@hub/core';
+import { loadConfig, mapActivity, mapWellness } from '@hub/core';
 import { Store } from '@hub/db';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -14,6 +14,12 @@ import { createMcpServer } from '../src/tools.ts';
 test('MCP client discovers bounded semantic tools, validates inputs, and never imports on read', async () => {
   const store = new Store(':memory:');
   await store.migrate();
+  const mapped = mapActivity(
+    { id: 'i123', type: 'Run', start_date_local: '2026-09-20T08:00:00', icu_intervals: [] },
+    true,
+  );
+  await store.saveRun(mapped.run, mapped.intervals);
+  await store.saveWellness(mapWellness({ id: '2026-09-20', restingHR: 50 }));
   const dir = await mkdtemp(join(tmpdir(), 'hub-mcp-'));
   const config = loadConfig({ WIKI_PATH: join(dir, 'wiki') });
   const server = createMcpServer(store, config);
@@ -27,7 +33,17 @@ test('MCP client discovers bounded semantic tools, validates inputs, and never i
     assert.ok(listed.tools.every((tool) => !['sql', 'fetch', 'sync'].includes(tool.name)));
     const result = await client.callTool({ name: 'get_data_status', arguments: {} });
     const content = result.content as { type: string; text: string }[];
-    assert.equal(JSON.parse(content[0].text).run_count, 0);
+    assert.equal(JSON.parse(content[0].text).run_count, 1);
+    const run = await client.callTool({ name: 'get_run', arguments: { id: 'i123' } });
+    assert.equal(JSON.parse((run.content as { text: string }[])[0].text).run.id, 'i123');
+    const health = await client.callTool({
+      name: 'get_health_data',
+      arguments: { start: '2026-09-20', end: '2026-09-20' },
+    });
+    assert.equal(
+      JSON.parse((health.content as { text: string }[])[0].text).items[0].resting_hr_bpm,
+      50,
+    );
     assert.equal((await store.syncHistory()).length, 0);
     const invalid = await client.callTool({
       name: 'list_runs',

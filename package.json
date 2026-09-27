@@ -22,8 +22,6 @@
     "test": "turbo run test",
     "migrate": "node --env-file-if-exists=.env apps/api/src/cli.ts migrate",
     "sync": "node --env-file-if-exists=.env apps/api/src/cli.ts sync",
-    "backup": "node --env-file-if-exists=.env apps/api/src/cli.ts backup",
-    "restore": "node --env-file-if-exists=.env apps/api/src/cli.ts restore",
     "export": "node --env-file-if-exists=.env apps/api/src/cli.ts export",
     "mcp": "node --env-file-if-exists=.env apps/mcp/src/stdio.ts"
   },
