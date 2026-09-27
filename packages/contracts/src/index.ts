@@ -7,6 +7,13 @@ export const dateSchema = z
     const parsed = new Date(`${value}T00:00:00Z`);
     return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
   }, 'Use a valid YYYY-MM-DD date');
+export const localTimestampSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/)
+  .refine((value) => {
+    const parsed = new Date(`${value}Z`);
+    return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 19) === value;
+  }, 'Use a valid local timestamp');
 export const rangeSchema = z.object({ start: dateSchema, end: dateSchema }).strict();
 export type DateRange = z.infer<typeof rangeSchema>;
 export const pageSchema = rangeSchema.extend({
@@ -31,13 +38,11 @@ export const healthMetrics = {
 } as const;
 export type HealthMetric = keyof typeof healthMetrics;
 export const metricSchema = z.enum(Object.keys(healthMetrics) as [HealthMetric, ...HealthMetric[]]);
-export const healthQuerySchema = pageSchema.extend({
-  metric: metricSchema.default('resting_hr_bpm'),
-});
+export const healthQuerySchema = pageSchema;
 const measurement = z.number().finite().nonnegative().nullable();
 export const runSchema = z.object({
-  id: z.string(),
-  start_time: z.string(),
+  id: z.string().min(1).max(200),
+  start_time: localTimestampSchema,
   indoor: z.number().int().min(0).max(1).nullable(),
   distance_m: measurement,
   duration_s: measurement,
@@ -57,7 +62,7 @@ export const runSchema = z.object({
 });
 export type Run = z.infer<typeof runSchema>;
 export const intervalSchema = z.object({
-  run_id: z.string(),
+  run_id: z.string().min(1).max(200),
   sequence: z.number().int().nonnegative(),
   interval_type: z.string().nullable(),
   duration_s: measurement,

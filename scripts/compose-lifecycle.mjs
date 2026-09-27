@@ -23,8 +23,6 @@ inside(
   'api',
   `
   import assert from 'node:assert/strict';
-  import { writeFile } from 'node:fs/promises';
-  import { gzipSync } from 'node:zlib';
   import { Store } from '@hub/db';
   const store = new Store(process.env.SQLITE_PATH);
   assert.equal((await store.syncHistory()).length, 0, 'Requires fresh validation volumes');
@@ -34,7 +32,6 @@ inside(
     completed_at: null, received: 0, upserted: 0, rejected: 0, requests: 0,
     completed_windows: 0, total_windows: 2, error_code: null,
   });
-  await writeFile('/app/data/snapshots/validation.json.gz', gzipSync('synthetic fixture'));
   await store.close();
 `,
 );
@@ -91,13 +88,10 @@ inside(
   'api',
   `
   import assert from 'node:assert/strict';
-  import { readFile } from 'node:fs/promises';
-  import { gunzipSync } from 'node:zlib';
   import { Store } from '@hub/db';
   const store = new Store(process.env.SQLITE_PATH);
   assert.equal((await store.syncHistory()).length, 1);
   assert.equal((await store.syncRun('${id}')).status, 'completed');
-  assert.equal(gunzipSync(await readFile('/app/data/snapshots/validation.json.gz')).toString(), 'synthetic fixture');
   assert.equal(store.sqlite.pragma('integrity_check', {simple: true}), 'ok');
   await store.close();
 `,
@@ -128,45 +122,4 @@ assert.equal(published.length, 1);
 assert.equal(published[0].URL, '127.0.0.1');
 assert.equal(published[0].PublishedPort, 8080);
 assert.ok(containers.every((container) => container.Health === 'healthy'));
-execFileSync(
-  'docker',
-  [
-    ...args,
-    'run',
-    '--rm',
-    '--no-deps',
-    '-T',
-    '-v',
-    `${project}_wiki:/app/athlete_wiki`,
-    'api',
-    'node',
-    '--input-type=module',
-  ],
-  {
-    env,
-    encoding: 'utf8',
-    input: `
-      import assert from 'node:assert/strict';
-      import { readFile } from 'node:fs/promises';
-      import { Store } from '@hub/db';
-      import { backup, restore, loadConfig } from '@hub/core';
-      const config = loadConfig();
-      const store = new Store(config.databasePath);
-      await backup(store, config, '/tmp/validation-backup');
-      await store.close();
-      await restore('/tmp/validation-backup', '/tmp/validation-restored');
-      const restored = new Store('/tmp/validation-restored/coach.sqlite');
-      assert.equal((await restored.syncRun('${id}')).status, 'completed');
-      assert.equal(await restored.acquireLease('restore-check'), true);
-      assert.match(await readFile('/tmp/validation-restored/wiki/validation.md', 'utf8'), /Synthetic/);
-      assert.deepEqual(
-        await readFile('/tmp/validation-restored/snapshots/validation.json.gz'),
-        await readFile('/app/data/snapshots/validation.json.gz'),
-      );
-      await restored.close();
-    `,
-  },
-);
-process.stdout.write(
-  'Nginx SSE, persistence, shared SQLite, health, port isolation, and backup/restore passed.\n',
-);
+process.stdout.write('Nginx SSE, persistence, shared SQLite, health, and port isolation passed.\n');

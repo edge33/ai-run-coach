@@ -12,7 +12,7 @@ const statements = [
     form_tsb REAL,
     training_load REAL CHECK(training_load >= 0),
     synced_at TEXT NOT NULL
-  )`,
+  ) STRICT`,
   `CREATE TABLE runs (
     id TEXT PRIMARY KEY,
     start_time TEXT NOT NULL,
@@ -32,7 +32,7 @@ const statements = [
     training_load REAL CHECK(training_load >= 0),
     synced_at TEXT NOT NULL,
     details_status TEXT NOT NULL CHECK(details_status IN ('complete', 'unavailable'))
-  )`,
+  ) STRICT`,
   'CREATE INDEX runs_start_time_id_idx ON runs(start_time, id)',
   `CREATE TABLE run_intervals (
     run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
@@ -50,7 +50,7 @@ const statements = [
     elevation_loss_m REAL CHECK(elevation_loss_m >= 0),
     avg_cadence_rpm REAL CHECK(avg_cadence_rpm >= 0),
     PRIMARY KEY(run_id, sequence)
-  )`,
+  ) STRICT`,
   `CREATE TABLE sync_runs (
     id TEXT PRIMARY KEY, mode TEXT NOT NULL, start TEXT NOT NULL, end TEXT NOT NULL,
     ranges_json TEXT NOT NULL, status TEXT NOT NULL, started_at TEXT NOT NULL, completed_at TEXT,

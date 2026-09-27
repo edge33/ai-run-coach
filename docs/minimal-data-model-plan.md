@@ -1,6 +1,6 @@
 # Minimal running data model: implementation tracker
 
-Approved: 2026-09-27. Status: phase 1 under review; later phases pending.
+Approved: 2026-09-27. Status: phases 1, 3, and 4 implemented; phase 2 source verification and phase 5 final CI pending; deployment reset pending.
 
 This plan supersedes conflicting data-model, snapshot, backup/restore, and migration requirements
 in [implementation-plan.md](implementation-plan.md). Unrelated architecture and repository rules
@@ -17,11 +17,11 @@ remain in force. See [progress.md](progress.md) for repository state and validat
 
 | Phase | Status | Owner | Evidence / blocker |
 | --- | --- | --- | --- |
-| 1. Contracts and database | In progress | Codex | Fresh database tests pass; review found SQLite key/type constraint gaps. |
-| 2. Import and synchronization | Pending | Unassigned | — |
-| 3. API, MCP, and web | Pending | Unassigned | — |
-| 4. Storage and operational cleanup | Pending | Unassigned | — |
-| 5. Automated validation | Pending | Unassigned | — |
+| 1. Contracts and database | Complete | Codex | STRICT domain tables, runtime schemas, date-boundary and FK tests pass. |
+| 2. Import and synchronization | In progress | Codex | Synthetic sync tests pass; current upstream OpenAPI field verification remains incomplete. |
+| 3. API, MCP, and web | Complete | Codex | Consumers and protocol tests use the new records. |
+| 4. Storage and operational cleanup | Complete | Codex | Snapshot/backup code removed; normalized export and disposable Compose lifecycle pass. |
+| 5. Automated validation | In progress | Codex | Local gates and Compose pass; await PR CI after push. |
 | 6. Data reset and manual import | Pending | Unassigned | — |
 
 Statuses: Pending, In progress, Blocked, Complete.
@@ -59,6 +59,7 @@ sequence and boolean storage use `INTEGER`.
 - Cadence retains upstream RPM units; presentation may convert to steps/minute explicitly.
 - Add `synced_at` to runs and wellness, and `details_status` to runs. Intervals inherit parent
   provenance. Retain sync history, coverage, issues, and leases as operational tables.
+- Domain tables use SQLite `STRICT` typing. Repository writes validate with shared Zod schemas.
 
 ### Wellness mapping
 
@@ -77,13 +78,24 @@ sequence and boolean storage use `INTEGER`.
 Daily wellness load values preserve upstream scope and may include other sports. Form is the
 defined absolute difference, not a promise to reproduce every Intervals.icu display setting.
 
+### Upstream field evidence
+
+Intervals.icu's [developer-published activity and interval model](https://forum.intervals.icu/t/server-side-data-model-for-scripts/25781/16)
+lists local time, distance, elapsed/moving seconds, speeds, HR, cadence, training load, and
+interval `max_watts`. The [developer's interval API example](https://forum.intervals.icu/t/api-access-to-intervals-icu/609/14)
+confirms `icu_intervals`, work/recovery type, elapsed time, speed, HR, power, and elevation gain.
+The [developer-published wellness model](https://forum.intervals.icu/t/server-side-data-model-for-scripts/25781/16)
+lists `restingHR`, `hrv`, `sleepSecs`, `weight`, `ctl`, `atl`, and `ctlLoad`.
+The reviewed model does not establish activity maximum power or elevation loss keys; both remain
+null. Current public OpenAPI access and a live credential-backed payload remain unverified.
+
 ## Implementation checklist
 
 ### 1. Contracts and database
 
 - [x] Replace the old schema with a clean initial Kysely migration; no legacy-record conversion.
       Keep future migrations immutable and ordered, with one module per migration.
-- [ ] Implement the three domain tables, indexes, foreign key, and operational metadata above.
+- [x] Implement the three domain tables, indexes, foreign key, and operational metadata above.
 - [x] Replace generic health-day/health-value storage and repository methods with wellness rows.
 - [x] Update shared schemas/types and metric enums; remove unsupported fields and snapshot references.
 - [x] Verify fresh migration success, repeated migration no-op behavior, and foreign-key enforcement.
@@ -93,41 +105,41 @@ defined absolute difference, not a promise to reproduce every Intervals.icu disp
 - [ ] Verify current upstream keys and units for every retained measurement, especially run maximum
       power and elevation loss. Public OpenAPI access failed during planning; record verification
       evidence here. Unsupported or absent fields remain null.
-- [ ] Accept only `Run`, `TrailRun`, and `VirtualRun`; implement the wellness mapping above.
-- [ ] Import ordered `icu_intervals`, including work and recovery, with nullable upstream type text.
-- [ ] Map only requested statistics; do not fetch streams or invent substitute maxima, loss, or speed.
-- [ ] Validate retained fields and discard all other payload fields before persistence or logging.
-- [ ] Upsert runs by source ID and wellness by date. Replace intervals transactionally only after a
+- [x] Accept only `Run`, `TrailRun`, and `VirtualRun`; implement the wellness mapping above.
+- [x] Import ordered `icu_intervals`, including work and recovery, with nullable upstream type text.
+- [x] Map only requested statistics; do not fetch streams or invent substitute maxima, loss, or speed.
+- [x] Validate retained fields and discard all other payload fields before persistence or logging.
+- [x] Upsert runs by source ID and wellness by date. Replace intervals transactionally only after a
       valid detail response; failed detail requests preserve prior intervals and mark detail status.
-- [ ] Preserve manual sync modes, bounded windows, retries, leases, coverage, and partial-failure
+- [x] Preserve manual sync modes, bounded windows, retries, leases, coverage, and partial-failure
       behavior. A valid empty interval response clears old intervals; an unavailable response does not.
 
 ### 3. API, MCP, and web
 
-- [ ] Update consumers together: repositories, summaries, API, MCP, and web views.
-- [ ] Keep existing endpoint paths and MCP tool names; revise response schemas and documentation.
+- [x] Update consumers together: repositories, summaries, API, MCP, and web views.
+- [x] Keep existing endpoint paths and MCP tool names; revise response schemas and documentation.
       Health retrieval returns dated wellness rows; summaries retain supported metric selection.
-- [ ] Use date/time labels instead of removed run names. Show indoor state only when known.
-- [ ] Preserve units, missingness, freshness, coverage, bounded pagination, and no-sync-on-read behavior.
+- [x] Use date/time labels instead of removed run names. Show indoor state only when known.
+- [x] Preserve units, missingness, freshness, coverage, bounded pagination, and no-sync-on-read behavior.
 
 ### 4. Storage and operational cleanup
 
-- [ ] Remove snapshot and backup/restore modules, commands, configuration, mounts, and related tests.
-- [ ] Keep export, emitting only the new normalized data without snapshot/backup dependencies.
-- [ ] Update Docker/Compose, example configuration, scripts, and operational documentation.
-- [ ] Update `docs/implementation-plan.md` to describe the implemented architecture and
+- [x] Remove snapshot and backup/restore modules, commands, configuration, mounts, and related tests.
+- [x] Keep export, emitting only the new normalized data without snapshot/backup dependencies.
+- [x] Update Docker/Compose, example configuration, scripts, and operational documentation.
+- [x] Update `docs/implementation-plan.md` to describe the implemented architecture and
       `docs/progress.md` with exact state and validation evidence.
-- [ ] Keep private data excluded from Git and Docker image layers, including legacy archive locations.
+- [x] Keep private data excluded from Git and Docker image layers, including legacy archive locations.
 
 ### 5. Automated validation
 
-- [ ] Test all retained mappings, nulls, zero, negative form, elapsed versus moving time, and local dates.
-- [ ] Test road, trail, treadmill, virtual runs, and exclusion of non-running activities.
-- [ ] Test repeated syncs, upstream edits, interval replacement, empty intervals, and detail failures.
-- [ ] Test revised API/MCP contracts, removed metrics, and local reads making no upstream requests.
+- [x] Test all retained mappings, nulls, zero, negative form, elapsed versus moving time, and local dates.
+- [x] Test road, trail, treadmill, virtual runs, and exclusion of non-running activities.
+- [x] Test repeated syncs, upstream edits, interval replacement, empty intervals, and detail failures.
+- [x] Test revised API/MCP contracts, removed metrics, and local reads making no upstream requests.
 - [ ] Verify discarded payload fields cannot reach SQLite, exports, logs, or snapshot files.
-- [ ] Run `npm run check`, `npm run typecheck`, `npm run lint`, `npm test`, and `npm run build`.
-- [ ] Run Compose migration, startup, health, and persistence checks with synthetic data; adapt lifecycle
+- [x] Run `npm run check`, `npm run typecheck`, `npm run lint`, `npm test`, and `npm run build`.
+- [x] Run Compose migration, startup, health, and persistence checks with synthetic data; adapt lifecycle
       checks to remove backup/restore expectations. Browser E2E remains deferred.
 
 ### 6. Data reset and manual import
@@ -157,13 +169,16 @@ the wiki or unrelated applications.
 | 2026-09-27 | Codex / phase 1 | `npm run typecheck` | Fails in `@hub/core` because phase 2–4 mapping, summaries, sync, backup, and tests still refer to removed schema and methods. No full test/build run yet. | Implement phase 2, then update consumers |
 | 2026-09-27 | Codex / PR | `gh pr create --draft --base main --head feature/minimal-data-model`; `gh pr checks 5 --watch` | Draft PR #5 opened. Both application jobs failed at `npm run typecheck` with the same old-schema references seen locally. | Keep PR draft while completing phases 2–4 |
 | 2026-09-27 | Codex / review | `npm run test -w @hub/db`; `npm run typecheck -w @hub/db`; isolated Node/SQLite probes | Database tests and typecheck pass. SQLite accepts null `wellness.date`/`runs.id`, text `weight_kg`, and noninteger interval sequences. A date query ending 9999-12-31 misses that day's run. An old database skips the new migration, but legacy databases are outside the approved fresh-start path. | Fix fresh-schema constraints; test boundary date |
+| 2026-09-27 | Codex / phases 1–4 | Add STRICT tables, runtime validation, date-boundary fix, normalized mappings, API/MCP/web consumers, export, and remove snapshot/backup code | Fresh database tests pass; source-activity IDs and wellness rows work through API/MCP; synthetic detail failure retains intervals and valid empty detail clears them | Run all gates and Compose |
+| 2026-09-27 | Codex / phase 5 | `npm run check`; `npm run typecheck`; `npm run lint`; `npm test`; `npm run build` | All pass locally. First sandbox test attempt closed MCP stdio subprocess; full suite passed outside sandbox. | Verify Compose and PR CI |
+| 2026-09-27 | Codex / phase 5 | `docker compose -p running-data-hub-validation config --quiet`; `up --build -d --wait`; `nginx -t`; `node scripts/compose-smoke.mjs`; `node scripts/compose-lifecycle.mjs`; `down -v` | All pass on disposable synthetic stack; its volumes removed. No athlete data or live credentials used. | Push to draft PR and review CI |
 
 For each implementation session, append commands and outcomes, including failures and checks not run.
 Do not mark a phase complete based only on code changes when its validation is still pending.
 
 ## Current handoff
 
-- Next action: fix fresh-schema constraints and the date boundary, then implement phase 2 mapping and sync against the new contracts and update all dependent consumers in phases 3–4.
-- Known verification gap: confirm current upstream keys/units before completing ingestion.
+- Next action: push changes to draft PR #5 and review CI. Confirm current upstream keys/units with live official documentation or a credential-backed import before marking phase 2 complete.
+- Known verification gap: current upstream activity maximum-power and elevation-loss keys were not confirmed; both remain null.
 - Deployment input still needed: explicit historical import range, unless supplied by later context.
-- Phase 1 changed code on `feature/minimal-data-model`; no athlete data, reset, import, push, or merge was performed.
+- Code changed on `feature/minimal-data-model`; no athlete data, reset, import, or merge was performed. The branch was pushed for draft PR #5.

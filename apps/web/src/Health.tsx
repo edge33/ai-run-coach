@@ -3,8 +3,8 @@ import {
   type HealthMetric,
   healthMetrics,
   healthSummarySchema,
-  healthValueSchema,
   localToday,
+  wellnessSchema,
 } from '@hub/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -16,14 +16,14 @@ export default function Health() {
   const status = useStatus();
   const today = status.data?.today ?? localToday('Europe/Rome');
   const [range, setRange] = useState({ start: addDays(today, -13), end: today });
-  const [metric, setMetric] = useState<HealthMetric>('resting_hr');
+  const [metric, setMetric] = useState<HealthMetric>('resting_hr_bpm');
   const [offset, setOffset] = useState(0);
   const observations = useQuery({
     queryKey: ['health', range, metric, offset],
     queryFn: () =>
       api(
-        `/health?${queryString({ ...range, metric, offset })}`,
-        z.object({ items: z.array(healthValueSchema), total: z.number() }),
+        `/health?${queryString({ ...range, offset })}`,
+        z.object({ items: z.array(wellnessSchema), total: z.number() }),
       ),
   });
   const summary = useQuery({
@@ -32,7 +32,7 @@ export default function Health() {
       api(`/summaries/health?${queryString({ ...range, metric })}`, healthSummarySchema),
   });
   const items = [...(observations.data?.items ?? [])].reverse();
-  const maximum = Math.max(1, ...items.map((item) => item.value ?? 0));
+  const maximum = Math.max(1, ...items.map((item) => Math.abs(item[metric] ?? 0)));
   const metadata = healthMetrics[metric];
   return (
     <>
@@ -113,16 +113,18 @@ export default function Health() {
               aria-label={`${metadata.definition} measurements on the current page; see the table for exact values.`}
             >
               {items.map((item) => (
-                <div className="chart-column" key={item.local_date}>
-                  <span className="chart-value">{number(item.value, 1)}</span>
+                <div className="chart-column" key={item.date}>
+                  <span className="chart-value">{number(item[metric], 1)}</span>
                   <div
-                    className={`chart-bar ${item.value === null ? 'missing' : ''}`}
+                    className={`chart-bar ${item[metric] === null ? 'missing' : ''}`}
                     style={{
                       height:
-                        item.value === null ? 4 : `${Math.max(2, (item.value / maximum) * 140)}px`,
+                        item[metric] === null
+                          ? 4
+                          : `${Math.max(2, (Math.abs(item[metric]) / maximum) * 140)}px`,
                     }}
                   />
-                  <span className="chart-date">{item.local_date.slice(5)}</span>
+                  <span className="chart-date">{item.date.slice(5)}</span>
                 </div>
               ))}
             </div>
@@ -137,12 +139,12 @@ export default function Health() {
                 </thead>
                 <tbody>
                   {observations.data?.items.map((item) => (
-                    <tr key={item.local_date}>
-                      <td>{item.local_date}</td>
+                    <tr key={item.date}>
+                      <td>{item.date}</td>
                       <td>
-                        {item.value === null
+                        {item[metric] === null
                           ? 'Not measured'
-                          : `${number(item.value, 2)} ${item.unit}`}
+                          : `${number(item[metric], 2)} ${metadata.unit}`}
                       </td>
                       <td>{metadata.field}</td>
                     </tr>

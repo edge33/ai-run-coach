@@ -1,4 +1,4 @@
-import { type DateRange, validateRange, type Wellness } from '@hub/contracts';
+import { type DateRange, validateRange, type Wellness, wellnessSchema } from '@hub/contracts';
 import type { Kysely } from 'kysely';
 import type { Database } from './schema.ts';
 
@@ -10,10 +10,11 @@ export class WellnessRepository {
   }
 
   async saveWellness(row: Wellness) {
+    const validRow = wellnessSchema.parse(row);
     await this.db
       .insertInto('wellness')
-      .values(row)
-      .onConflict((oc) => oc.column('date').doUpdateSet(row))
+      .values(validRow)
+      .onConflict((oc) => oc.column('date').doUpdateSet(validRow))
       .execute();
   }
 

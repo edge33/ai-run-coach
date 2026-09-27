@@ -56,13 +56,10 @@ export function Runs() {
                   {query.data.items.map((run) => (
                     <tr key={run.id}>
                       <td>
-                        <Link to={`/runs/${run.id}`}>{run.name}</Link>
-                        <small>
-                          {run.sport}
-                          {run.indoor === 1 ? ' · Indoor' : ''}
-                        </small>
+                        <Link to={`/runs/${run.id}`}>{run.start_time.replace('T', ' ')}</Link>
+                        <small>{run.indoor === 1 ? ' · Indoor' : ''}</small>
                       </td>
-                      <td>{run.local_date}</td>
+                      <td>{run.start_time.slice(0, 10)}</td>
                       <td>{number(run.distance_m == null ? null : run.distance_m / 1000, 2)} km</td>
                       <td>
                         {number(run.moving_time_s == null ? null : run.moving_time_s / 60)} min

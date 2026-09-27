@@ -1,4 +1,5 @@
 import {
+  addDays,
   type DateRange,
   type HealthMetric,
   type HealthSummary,
@@ -21,19 +22,19 @@ function warningsForCoverage(
 }
 export async function summarizeRuns(store: Store, range: DateRange): Promise<RunSummary> {
   validateRange(range);
-  const rows = await store.db
+  let query = store.db
     .selectFrom('runs')
-    .select(['distance_m', 'moving_time_s', 'elevation_m', 'training_load'])
-    .where('local_date', '>=', range.start)
-    .where('local_date', '<=', range.end)
-    .execute();
+    .select(['distance_m', 'moving_time_s', 'elevation_gain_m', 'training_load'])
+    .where('start_time', '>=', range.start);
+  if (range.end !== '9999-12-31') query = query.where('start_time', '<', addDays(range.end, 1));
+  const rows = await query.execute();
   const coverage = await store.coverage(range);
   const warnings = warningsForCoverage(coverage, 'runs', range);
   const values: RunSummary['values'] = {};
   for (const [key, unit] of [
     ['distance_m', 'm'],
     ['moving_time_s', 's'],
-    ['elevation_m', 'm'],
+    ['elevation_gain_m', 'm'],
     ['training_load', 'Intervals.icu load'],
   ] as const) {
     const measured = rows.filter((r) => r[key] !== null);
@@ -80,13 +81,12 @@ export async function summarizeHealth(
 ): Promise<HealthSummary> {
   validateRange(range);
   const rows = await store.db
-    .selectFrom('health_values')
-    .select('value')
-    .where('metric', '=', metric)
-    .where('local_date', '>=', range.start)
-    .where('local_date', '<=', range.end)
+    .selectFrom('wellness')
+    .select(metric)
+    .where('date', '>=', range.start)
+    .where('date', '<=', range.end)
     .execute();
-  const values = rows.flatMap((r) => (r.value === null ? [] : [r.value]));
+  const values = rows.flatMap((r) => (r[metric] === null ? [] : [r[metric]]));
   const coverage = await store.coverage(range);
   const { unit, definition } = healthMetrics[metric];
   return {

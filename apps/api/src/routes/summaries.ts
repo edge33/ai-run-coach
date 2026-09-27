@@ -1,6 +1,6 @@
 import {
-  healthQuerySchema,
   healthSummarySchema,
+  metricSchema,
   rangeSchema,
   runSummarySchema,
   validateRange,
@@ -16,7 +16,7 @@ export function registerSummariesRoutes(routes: FastifyInstance, store: Store) {
     { schema: { querystring: jsonSchema(rangeSchema), response: response(runSummarySchema) } },
     async (request) => summarizeRuns(store, validateRange(rangeSchema.parse(request.query))),
   );
-  const healthSummaryQuery = rangeSchema.extend({ metric: healthQuerySchema.shape.metric });
+  const healthSummaryQuery = rangeSchema.extend({ metric: metricSchema });
   routes.get(
     '/summaries/health',
     {

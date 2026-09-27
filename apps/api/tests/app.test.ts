@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { beginSync, executeSync, loadConfig } from '@hub/core';
+import { beginSync, executeSync, loadConfig, mapActivity, mapWellness } from '@hub/core';
 import { Store } from '@hub/db';
 import { buildApp } from '../src/app.ts';
 
@@ -12,7 +12,6 @@ test('HTTP reads are local; schemas, origins, empty states and manual sync error
   const config = loadConfig({
     SQLITE_PATH: join(dir, 'db.sqlite'),
     APP_ORIGINS: 'http://localhost',
-    SNAPSHOT_PATH: join(dir, 'snapshots'),
   });
   const store = new Store(config.databasePath);
   await store.migrate();
@@ -30,6 +29,34 @@ test('HTTP reads are local; schemas, origins, empty states and manual sync error
     const runs = await app.inject({ url: '/api/runs?start=2026-09-20&end=2026-09-21' });
     assert.equal(runs.statusCode, 200);
     assert.equal(runs.json().total, 0);
+    const mapped = mapActivity(
+      {
+        id: 'i123',
+        type: 'Run',
+        start_date_local: '2026-09-20T08:00:00',
+        distance: 5000,
+        icu_intervals: [{ type: 'WORK', elapsed_time: 1800 }],
+      },
+      true,
+    );
+    await store.saveRun(mapped.run, mapped.intervals);
+    await store.saveWellness(mapWellness({ id: '2026-09-20', hrv: 42 }));
+    const detail = await app.inject({ url: '/api/runs/i123' });
+    assert.equal(detail.statusCode, 200);
+    assert.equal(detail.json().run.id, 'i123');
+    assert.equal(detail.json().intervals[0].sequence, 0);
+    const health = await app.inject({ url: '/api/health?start=2026-09-20&end=2026-09-20' });
+    assert.equal(health.statusCode, 200);
+    assert.equal(health.json().items[0].hrv_ms, 42);
+    assert.equal(health.json().items[0].source_json, undefined);
+    assert.equal(
+      (
+        await app.inject({
+          url: '/api/summaries/health?start=2026-09-20&end=2026-09-20&metric=hrv_sdnn',
+        })
+      ).statusCode,
+      400,
+    );
     assert.equal(
       (await app.inject({ url: '/api/runs?start=2026-02-30&end=2026-09-21' })).statusCode,
       400,

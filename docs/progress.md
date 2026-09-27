@@ -4,38 +4,26 @@ Last updated: 2026-09-27
 
 ## Minimal data model implementation
 
-- Approved plan and phase checklist: [minimal-data-model-plan.md](minimal-data-model-plan.md).
-  This supersedes the older snapshot, backup/restore, and data-model requirements in the original
-  architecture document. Use the tracker for phase status, acceptance checks, and execution evidence.
-- Decisions: fresh SQLite database with Kysely; minimal wellness/run/interval records; no snapshots,
-  backups, or legacy-data migration. Preserve configuration, credentials, and the athlete wiki.
-- Phase 1 is under review on `feature/minimal-data-model`, based on fetched `origin/main` at
-  `9b3aeb5`. The clean initial migration defines wellness, runs, run intervals, and operational
-  tables; shared contracts and database repositories use the new fields. The existing worktree
-  planning-document edits were preserved. No athlete database, reset, or import was touched.
-- `npm run check:fix`, `npm run test -w @hub/db` (3 passed), `npm run typecheck -w @hub/db`,
-  `npm run check`, and `git diff --check` passed. The database tests cover fresh and repeated
-  migration, FK and measurement constraints, upserts, lease exclusion, and interval rollback.
-- `npm run typecheck` fails in `@hub/core`: mapping, sync, summaries, backup, and old tests still
-  use removed schema fields and methods. This is the expected phase 2–4 integration gap. Full
-  tests and build were not run. The application should not be run against a fresh database until
-  those phases are complete.
-- Draft [PR #5](https://github.com/edge33/ai-run-coach/pull/5) is open against `main`. Both
-  application CI jobs failed at `npm run typecheck` with the same old-schema references. Keep
-  the PR in draft while completing the dependent phases.
-- Adversarial review reproduced two fresh-database defects: SQLite accepts null domain primary
-  keys, text measurements, and noninteger interval sequences; querying runs through `9999-12-31`
-  returns zero for a run on that date. Focused database tests and typecheck still pass. A probe
-  against an old database showed the reused migration ID skips the new schema; this is outside
-  the approved fresh-start path and is not a phase 1 blocker.
-- Documentation validation: `git diff --check` passed. A Python check verified 34 pending checklist
-  items, linked document existence, and no trailing whitespace in the new tracker. The first check
-  incorrectly expected 32 items; correcting that assertion to the actual 34 passed. Application
-  tests were not run for this documentation-only change.
-- Next recommended action: fix the fresh-schema constraints and date boundary;
-  then implement phase 2 ingestion and synchronization, verifying upstream mappings before
-  completion. Update API, MCP, web, and operational consumers afterward. Record a manual
-  historical import range before the final import.
+- Branch: `feature/minimal-data-model`, based on fetched `origin/main` at `9b3aeb5`.
+  Draft [PR #5](https://github.com/edge33/ai-run-coach/pull/5) remains open; no merge was performed.
+- The fresh SQLite migration now uses `STRICT` domain tables. Repository writes parse the shared
+  Zod contracts, and run date queries include the maximum valid date. Source IDs, wellness rows,
+  ordered intervals, nullable measurements, and same-day form follow the approved tracker.
+- Manual sync retains only normalized fields, handles detail failure without deleting intervals,
+  and does not run on reads. API, MCP, web, summaries, export, Compose, and lifecycle checks use the
+  new model. Snapshot and backup/restore functionality and configuration have been removed.
+- `npm run check`, `npm run typecheck`, `npm run lint`, `npm test` (outside the sandbox for the MCP
+  stdio subprocess), and `npm run build` pass locally. Database, core, API, MCP, and web tests pass.
+  A sandbox-only `npm test` attempt closed the MCP stdio connection; the same suite passed outside.
+- The disposable `running-data-hub-validation` Compose project passed `config --quiet`,
+  `up --build -d --wait`, `nginx -t`, `scripts/compose-smoke.mjs`, and
+  `scripts/compose-lifecycle.mjs` with synthetic data. `down -v` removed only its volumes.
+- Upstream field evidence is recorded in the tracker. The official forum model supports wellness
+  keys, activity speeds, and interval `max_watts`; run maximum power and elevation loss remain null
+  because a supported source key was not confirmed. A live credential-backed import has not run.
+- Next action: finish source-key verification if current official OpenAPI access becomes available,
+  then review CI on PR #5. The one-time athlete-data reset and explicit historical import remain
+  pending; do not infer a historical range from `all` on an empty database.
 
 ## Pre-redesign state (historical)
 
@@ -173,10 +161,9 @@ registered `running_data_hub` MCP server; a new Codex session is needed after re
 The Synchronization view or
 `npm run sync` explicitly starts an import; service startup does not.
 
-`npm run backup -- DESTINATION` creates a coordinated backup in a new empty directory.
-`npm run restore -- BACKUP_DIR EMPTY_DESTINATION` verifies and restores it. Point `SQLITE_PATH`,
-`SNAPSHOT_PATH`, and `WIKI_PATH` to the restored `coach.sqlite`, `snapshots`, and `wiki` respectively.
-For Compose backups, run a helper with all three volumes mounted: API alone has no wiki mount.
+`npm run export -- DESTINATION` writes normalized JSON records into a new empty directory.
+The legacy backup and restore commands have been removed. The deployment reset remains a separate,
+one-time action in the minimal-model tracker.
 The lifecycle script demonstrates that helper and verifies restoration without touching host data.
 
 ## Update discipline

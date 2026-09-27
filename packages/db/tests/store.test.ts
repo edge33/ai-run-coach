@@ -90,10 +90,42 @@ test('fresh migration is repeatable and enforces the minimal schema', async () =
         .run('missing', 0),
     );
     assert.throws(() => api.sqlite.prepare('UPDATE wellness SET weight_kg = -1').run());
+    assert.throws(() =>
+      api.sqlite.prepare('INSERT INTO wellness (date, synced_at) VALUES (NULL, ?)').run('now'),
+    );
+    assert.throws(() =>
+      api.sqlite
+        .prepare(
+          'INSERT INTO runs (id, start_time, synced_at, details_status) VALUES (NULL, ?, ?, ?)',
+        )
+        .run('2026-09-20T08:00:00', 'now', 'complete'),
+    );
+    assert.throws(() =>
+      api.sqlite.prepare('UPDATE wellness SET weight_kg = ?').run('not-a-number'),
+    );
+    assert.throws(() =>
+      api.sqlite
+        .prepare('INSERT INTO run_intervals (run_id, sequence) VALUES (?, ?)')
+        .run('run-one', 0.5),
+    );
+    await assert.rejects(
+      api.saveRun({ ...run('bad-date'), start_time: '2026-02-30T08:00:00' }, []),
+    );
+    assert.equal((await api.listRuns({ start: '2026-09-20', end: '2026-09-20' })).total, 1);
   } finally {
     await api.close();
     await mcp.close();
     await rm(dir, { recursive: true });
+  }
+});
+test('maximum valid local date is included in run queries', async () => {
+  const store = new Store(':memory:');
+  await store.migrate();
+  try {
+    await store.saveRun({ ...run(), start_time: '9999-12-31T12:00:00' }, []);
+    assert.equal((await store.listRuns({ start: '9999-12-31', end: '9999-12-31' })).total, 1);
+  } finally {
+    await store.close();
   }
 });
 

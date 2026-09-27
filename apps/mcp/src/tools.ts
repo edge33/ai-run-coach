@@ -78,14 +78,17 @@ export function createMcpServer(store: Store, config: Config) {
   tool(
     'get_run',
     'Read a run and a bounded page of its intervals.',
-    { id: z.string().uuid(), interval_offset: z.number().int().min(0).max(10000).default(0) },
+    {
+      id: z.string().min(1).max(200),
+      interval_offset: z.number().int().min(0).max(10000).default(0),
+    },
     async (q) => store.getRun(q.id, q.interval_offset),
   );
   tool(
     'get_health_data',
-    'Read one health measurement definition at a time; null means unmeasured.',
+    'Read dated wellness rows; null means unmeasured.',
     healthQuerySchema.shape,
-    async (q) => store.listHealth(validateRange(q), q.metric, q.limit, q.offset),
+    async (q) => store.listWellness(validateRange(q), q.limit, q.offset),
   );
   tool(
     'summarize_runs',

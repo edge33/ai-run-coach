@@ -1,4 +1,4 @@
-import { addDays, type DateRange, validateRange } from '@hub/contracts';
+import { addDays, type DateRange, intervalSchema, runSchema, validateRange } from '@hub/contracts';
 import type { IntervalRow, RunRow } from './schema.ts';
 export const runColumns = [
   'id',
@@ -49,22 +49,24 @@ export class RunRepository {
 
   async listRuns(range: DateRange, limit = 50, offset = 0) {
     validateRange(range);
-    const items = await this.db
+    const endExclusive = range.end === '9999-12-31' ? null : addDays(range.end, 1);
+    let itemsQuery = this.db
       .selectFrom('runs')
       .select(runColumns)
-      .where('start_time', '>=', range.start)
-      .where('start_time', '<', addDays(range.end, 1))
+      .where('start_time', '>=', range.start);
+    if (endExclusive) itemsQuery = itemsQuery.where('start_time', '<', endExclusive);
+    const items = await itemsQuery
       .orderBy('start_time', 'desc')
       .orderBy('id')
       .limit(limit)
       .offset(offset)
       .execute();
-    const count = await this.db
+    let countQuery = this.db
       .selectFrom('runs')
       .select((eb) => eb.fn.countAll<number>().as('count'))
-      .where('start_time', '>=', range.start)
-      .where('start_time', '<', addDays(range.end, 1))
-      .executeTakeFirstOrThrow();
+      .where('start_time', '>=', range.start);
+    if (endExclusive) countQuery = countQuery.where('start_time', '<', endExclusive);
+    const count = await countQuery.executeTakeFirstOrThrow();
     return { items, total: Number(count.count), limit, offset };
   }
 
@@ -92,18 +94,20 @@ export class RunRepository {
   }
 
   async saveRun(run: RunRow, intervals: IntervalRow[] | null) {
+    const validRun = runSchema.parse(run);
+    const validIntervals = intervals?.map((interval) => intervalSchema.parse(interval)) ?? null;
     await this.db.transaction().execute(async (tx) => {
       await tx
         .insertInto('runs')
-        .values(run)
-        .onConflict((oc) => oc.column('id').doUpdateSet(run))
+        .values(validRun)
+        .onConflict((oc) => oc.column('id').doUpdateSet(validRun))
         .execute();
-      if (intervals !== null) {
-        await tx.deleteFrom('run_intervals').where('run_id', '=', run.id).execute();
-        for (const interval of intervals)
+      if (validIntervals !== null) {
+        await tx.deleteFrom('run_intervals').where('run_id', '=', validRun.id).execute();
+        for (const interval of validIntervals)
           await tx
             .insertInto('run_intervals')
-            .values({ ...interval, run_id: run.id })
+            .values({ ...interval, run_id: validRun.id })
             .execute();
       }
     });

@@ -12,7 +12,6 @@ import { z } from 'zod';
 import type { Config } from './config.ts';
 import { IntervalsClient, UpstreamError } from './intervals.ts';
 import { activitySchema, mapActivity, mapWellness, runningTypes } from './mapping.ts';
-import { snapshot } from './snapshots.ts';
 
 export function splitWindows(ranges: DateRange[]): DateRange[] {
   return ranges.flatMap((range) => {
@@ -26,7 +25,7 @@ export function splitWindows(ranges: DateRange[]): DateRange[] {
 }
 export class SyncBusyError extends Error {
   constructor() {
-    super('A sync or backup is already running');
+    super('A sync is already running');
   }
 }
 export async function beginSync(
@@ -123,7 +122,6 @@ export async function executeSync(
             resource === 'runs'
               ? await client.activities(range.start, range.end)
               : await client.wellness(range.start, range.end);
-          const snapshotId = await snapshot(store, config, id, resource, data);
           const rows = z.array(z.unknown()).max(20000).parse(data);
           for (const row of rows) {
             await assertLease();
@@ -143,31 +141,28 @@ export async function executeSync(
                 )
                   throw new Error('OUT_OF_RANGE');
                 let source: unknown = row;
-                let detailSnapshot = snapshotId;
                 let complete = false;
                 try {
                   const detail = await client.activity(summary.id);
-                  detailSnapshot = await snapshot(store, config, id, 'run_detail', detail);
                   const parsed = activitySchema.parse(detail);
                   if (parsed.id !== summary.id) throw new Error('ID_MISMATCH');
                   source = { ...summary, ...parsed };
-                  mapActivity(source, detailSnapshot, config.timezone, true);
+                  mapActivity(source, true);
                   complete = true;
                 } catch {
                   rejectedInWindow++;
                   run.rejected++;
                   await store.issue(id, resource, 'DETAIL_UNAVAILABLE', summary.id);
                   source = row;
-                  detailSnapshot = snapshotId;
                 }
-                const mapped = mapActivity(source, detailSnapshot, config.timezone, complete);
+                const mapped = mapActivity(source, complete);
                 await assertLease();
                 await store.saveRun(mapped.run, mapped.intervals);
               } else {
-                const mapped = mapWellness(row, snapshotId);
-                if (mapped.day.local_date < range.start || mapped.day.local_date > range.end)
+                const mapped = mapWellness(row);
+                if (mapped.date < range.start || mapped.date > range.end)
                   throw new Error('OUT_OF_RANGE');
-                await store.saveHealth(mapped.day, mapped.values);
+                await store.saveWellness(mapped);
               }
               run.upserted++;
             } catch {

@@ -1,9 +1,8 @@
 # Running Data Hub implementation plan
 
-> Approved revision (2026-09-27): follow
-> [Minimal running data model: implementation tracker](minimal-data-model-plan.md) for the next
-> implementation. It supersedes conflicting data-model, snapshot, backup/restore, and migration
-> requirements below. The remaining architecture still applies; the redesign is not yet implemented.
+> The minimal model in [the implementation tracker](minimal-data-model-plan.md) supersedes the
+> original data model, snapshot, backup/restore, and migration requirements below. The code now
+> uses that model; operational reset and historical import remain separate deployment steps.
 
 ## Purpose
 
@@ -26,11 +25,11 @@ apps/
   mcp/          Shared MCP tools over stdio and Streamable HTTP
 packages/
   contracts/    Browser-safe Zod schemas and shared types
-  core/         Intervals client, ingestion, summaries, wiki, backup/restore
+  core/         Intervals client, ingestion, summaries, wiki, normalized export
   db/           Kysely repositories, SQLite migrations, leases
   config/       Shared TypeScript configuration
 athlete_wiki/   Local Markdown knowledge, excluded from Git
-data/           SQLite, snapshots, and backups, excluded from Git
+data/           SQLite, excluded from Git
 ```
 
 Run API, MCP, and shared-library TypeScript directly on Node 24.21.0 using erasable syntax.
@@ -41,14 +40,14 @@ across all code workspaces and keep TypeScript checking as a separate gate.
 
 Use SQLite with `better-sqlite3` and Kysely. Enable foreign keys, WAL, and a busy timeout. Mount the
 whole database directory so SQLite sidecar files stay with the database. API and MCP processes share
-the same database, while an atomic lease prevents concurrent synchronization or backup writers.
+the same database, while an atomic lease prevents concurrent synchronization writers.
 
 Persist:
 
-- completed running activities, including trail and treadmill runs;
-- source-provided laps or intervals;
-- daily health observations with metric definitions and units;
-- source JSON, hashes, compressed snapshot references, sync runs, issues, and coverage.
+- completed road, trail, treadmill, and virtual running activities;
+- source-provided intervals in upstream order;
+- daily wellness rows with the approved measurements and units;
+- minimal sync runs, issues, coverage, and writer leases.
 
 Do not persist training periods, calendar events, readiness scores, coaching proposals, or generated
 plans. Calculate only simple deterministic summaries on demand: run totals, aggregate pace from
@@ -62,8 +61,8 @@ Synchronization is exclusively user-triggered:
 - all: reconcile all previously imported ranges.
 
 Use bounded 90-day request windows, end-to-end timeouts, bounded retry/backoff with `Retry-After`,
-rate-limit observations, runtime response validation, transactional upserts, and compressed raw
-snapshots. Preserve the last valid records on partial or failed imports. Absence from an incomplete
+rate-limit observations, runtime response validation, and transactional upserts. Retain only the
+approved normalized fields. Preserve the last valid records on partial or failed imports. Absence from an incomplete
 response never proves deletion. Opening the app, reading local APIs, querying MCP, and restarting
 containers must not contact Intervals.icu.
 
@@ -99,16 +98,15 @@ validate host/origin headers, and bound bodies, ranges, pages, and responses.
 
 Build one multi-stage Dockerfile with a non-root Node runtime target for API/MCP/migrations and an
 Nginx target containing the production Vite assets. Docker Compose runs one-shot migrations, API,
-MCP, and Nginx with named volumes for the database, snapshots, and wiki.
+MCP, and Nginx with named volumes for the database and wiki.
 
 Only Nginx publishes `${TAILSCALE_IP}:8080`. API and MCP stay on the internal Compose network. Nginx
 serves the SPA, proxies `/api` and `/mcp`, preserves protocol headers, and disables buffering for SSE
 and MCP streams. Deployment assumes the host already participates in Tailscale. Authentication is
 outside v1; host/origin validation and request limits remain enabled.
 
-Provide coordinated SQLite backup/restore/export commands. Use SQLite’s backup API instead of copying
-a live database file, lock the writer and wiki during backup, checksum the archive, clear stale leases
-after restore, and verify database integrity.
+Provide a normalized JSON export command. The one-time fresh start deletes only this application's
+legacy database and data archives after writers stop; credentials, configuration, and wiki persist.
 
 ## Acceptance
 
@@ -117,5 +115,5 @@ after restore, and verify database integrity.
 - Stdio and HTTP MCP expose equivalent bounded tools without protocol contamination.
 - Compose builds and starts; migrations complete; API/MCP/Nginx health checks pass.
 - Nginx serves SPA deep links, preserves API errors, proxies MCP, and streams progress.
-- SQLite, snapshots, and wiki survive application-container recreation; only Nginx publishes a port.
-- A coordinated backup restores equivalent records, summaries, wiki revisions, and a usable lease state.
+- SQLite and wiki survive application-container recreation; only Nginx publishes a port.
+- Normalized export contains only the approved records and operational metadata.

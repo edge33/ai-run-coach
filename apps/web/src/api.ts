@@ -10,7 +10,7 @@ export async function api<T>(path: string, schema: z.ZodType<T>, init?: RequestI
       data.error === 'CREDENTIALS_NOT_CONFIGURED'
         ? 'Add your Intervals API key to the server configuration before syncing.'
         : data.error === 'SYNC_BUSY'
-          ? 'A synchronization or backup is already running.'
+          ? 'A synchronization is already running.'
           : `Request failed (${response.status}). ${data.error ?? 'Try again.'}`,
     );
   }
