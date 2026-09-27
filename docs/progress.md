@@ -9,7 +9,7 @@ Last updated: 2026-09-27
   architecture document. Use the tracker for phase status, acceptance checks, and execution evidence.
 - Decisions: fresh SQLite database with Kysely; minimal wellness/run/interval records; no snapshots,
   backups, or legacy-data migration. Preserve configuration, credentials, and the athlete wiki.
-- Phase 1 is complete on `feature/minimal-data-model`, based on fetched `origin/main` at
+- Phase 1 is under review on `feature/minimal-data-model`, based on fetched `origin/main` at
   `9b3aeb5`. The clean initial migration defines wellness, runs, run intervals, and operational
   tables; shared contracts and database repositories use the new fields. The existing worktree
   planning-document edits were preserved. No athlete database, reset, or import was touched.
@@ -23,12 +23,18 @@ Last updated: 2026-09-27
 - Draft [PR #5](https://github.com/edge33/ai-run-coach/pull/5) is open against `main`. Both
   application CI jobs failed at `npm run typecheck` with the same old-schema references. Keep
   the PR in draft while completing the dependent phases.
+- Adversarial review reproduced three phase 1 defects with disposable SQLite databases: an old
+  database with migration ID `001_initial` makes the new migrator report success without creating
+  `wellness`; SQLite accepts null domain primary keys, text measurements, and noninteger interval
+  sequences; querying runs through `9999-12-31` returns zero for a run on that date. Focused
+  database tests and typecheck still pass. These findings are tracked in the phase checklist.
 - Documentation validation: `git diff --check` passed. A Python check verified 34 pending checklist
   items, linked document existence, and no trailing whitespace in the new tracker. The first check
   incorrectly expected 32 items; correcting that assertion to the actual 34 passed. Application
   tests were not run for this documentation-only change.
-- Next recommended action: implement phase 2 ingestion and synchronization, verifying upstream
-  mappings before completion; then update API, MCP, web, and operational consumers. Record a manual
+- Next recommended action: fix the phase 1 migration guard, schema constraints, and date boundary;
+  then implement phase 2 ingestion and synchronization, verifying upstream mappings before
+  completion. Update API, MCP, web, and operational consumers afterward. Record a manual
   historical import range before the final import.
 
 ## Pre-redesign state (historical)

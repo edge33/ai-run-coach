@@ -1,6 +1,6 @@
 # Minimal running data model: implementation tracker
 
-Approved: 2026-09-27. Status: phase 1 complete; later phases pending.
+Approved: 2026-09-27. Status: phase 1 under review; later phases pending.
 
 This plan supersedes conflicting data-model, snapshot, backup/restore, and migration requirements
 in [implementation-plan.md](implementation-plan.md). Unrelated architecture and repository rules
@@ -17,7 +17,7 @@ remain in force. See [progress.md](progress.md) for repository state and validat
 
 | Phase | Status | Owner | Evidence / blocker |
 | --- | --- | --- | --- |
-| 1. Contracts and database | Complete | Codex | Fresh migration and repository tests pass; downstream consumers await phases 2–4. |
+| 1. Contracts and database | In progress | Codex | Adversarial review found old-schema migration collision and SQLite key/type constraint gaps; fresh database tests pass. |
 | 2. Import and synchronization | Pending | Unassigned | — |
 | 3. API, MCP, and web | Pending | Unassigned | — |
 | 4. Storage and operational cleanup | Pending | Unassigned | — |
@@ -83,10 +83,10 @@ defined absolute difference, not a promise to reproduce every Intervals.icu disp
 
 - [x] Replace the old schema with a clean initial Kysely migration; no legacy-record conversion.
       Keep future migrations immutable and ordered, with one module per migration.
-- [x] Implement the three domain tables, indexes, foreign key, and operational metadata above.
+- [ ] Implement the three domain tables, indexes, foreign key, and operational metadata above.
 - [x] Replace generic health-day/health-value storage and repository methods with wellness rows.
 - [x] Update shared schemas/types and metric enums; remove unsupported fields and snapshot references.
-- [x] Verify fresh migration success, repeated migration no-op behavior, and foreign-key enforcement.
+- [ ] Verify fresh migration success, repeated migration no-op behavior, and foreign-key enforcement.
 
 ### 2. Import and synchronization
 
@@ -156,13 +156,14 @@ the wiki or unrelated applications.
 | 2026-09-27 | Codex / phase 1 | `npm run check:fix`; `npm run test -w @hub/db`; `npm run typecheck -w @hub/db`; `npm run check`; `git diff --check` | All pass; 3 database tests cover repeat migration, FK and measurement constraints, upsert, leases, rollback | Update import and consumers |
 | 2026-09-27 | Codex / phase 1 | `npm run typecheck` | Fails in `@hub/core` because phase 2–4 mapping, summaries, sync, backup, and tests still refer to removed schema and methods. No full test/build run yet. | Implement phase 2, then update consumers |
 | 2026-09-27 | Codex / PR | `gh pr create --draft --base main --head feature/minimal-data-model`; `gh pr checks 5 --watch` | Draft PR #5 opened. Both application jobs failed at `npm run typecheck` with the same old-schema references seen locally. | Keep PR draft while completing phases 2–4 |
+| 2026-09-27 | Codex / review | `npm run test -w @hub/db`; `npm run typecheck -w @hub/db`; isolated Node/SQLite probes | Database tests and typecheck pass. Reusing migration ID `001_initial` silently skips new schema on an old database. SQLite accepts null `wellness.date`/`runs.id`, text `weight_kg`, and noninteger interval sequences. A date query ending 9999-12-31 misses that day's run. | Fix migration guard and schema constraints; test boundary date |
 
 For each implementation session, append commands and outcomes, including failures and checks not run.
 Do not mark a phase complete based only on code changes when its validation is still pending.
 
 ## Current handoff
 
-- Next action: implement phase 2 mapping and sync against the new contracts, then update all dependent consumers in phases 3–4.
+- Next action: fix phase 1 review findings, then implement phase 2 mapping and sync against the new contracts and update all dependent consumers in phases 3–4.
 - Known verification gap: confirm current upstream keys/units before completing ingestion.
 - Deployment input still needed: explicit historical import range, unless supplied by later context.
 - Phase 1 changed code on `feature/minimal-data-model`; no athlete data, reset, import, push, or merge was performed.
