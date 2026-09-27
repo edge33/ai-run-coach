@@ -23,16 +23,16 @@ Last updated: 2026-09-27
 - Draft [PR #5](https://github.com/edge33/ai-run-coach/pull/5) is open against `main`. Both
   application CI jobs failed at `npm run typecheck` with the same old-schema references. Keep
   the PR in draft while completing the dependent phases.
-- Adversarial review reproduced three phase 1 defects with disposable SQLite databases: an old
-  database with migration ID `001_initial` makes the new migrator report success without creating
-  `wellness`; SQLite accepts null domain primary keys, text measurements, and noninteger interval
-  sequences; querying runs through `9999-12-31` returns zero for a run on that date. Focused
-  database tests and typecheck still pass. These findings are tracked in the phase checklist.
+- Adversarial review reproduced two fresh-database defects: SQLite accepts null domain primary
+  keys, text measurements, and noninteger interval sequences; querying runs through `9999-12-31`
+  returns zero for a run on that date. Focused database tests and typecheck still pass. A probe
+  against an old database showed the reused migration ID skips the new schema; this is outside
+  the approved fresh-start path and is not a phase 1 blocker.
 - Documentation validation: `git diff --check` passed. A Python check verified 34 pending checklist
   items, linked document existence, and no trailing whitespace in the new tracker. The first check
   incorrectly expected 32 items; correcting that assertion to the actual 34 passed. Application
   tests were not run for this documentation-only change.
-- Next recommended action: fix the phase 1 migration guard, schema constraints, and date boundary;
+- Next recommended action: fix the fresh-schema constraints and date boundary;
   then implement phase 2 ingestion and synchronization, verifying upstream mappings before
   completion. Update API, MCP, web, and operational consumers afterward. Record a manual
   historical import range before the final import.
