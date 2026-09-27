@@ -18,11 +18,12 @@ Last updated: 2026-09-27
 - The disposable `running-data-hub-validation` Compose project passed `config --quiet`,
   `up --build -d --wait`, `nginx -t`, `scripts/compose-smoke.mjs`, and
   `scripts/compose-lifecycle.mjs` with synthetic data. `down -v` removed only its volumes.
+- Both application jobs on draft PR #5 passed the complete GitHub workflow, including Compose.
 - Upstream field evidence is recorded in the tracker. The official forum model supports wellness
   keys, activity speeds, and interval `max_watts`; run maximum power and elevation loss remain null
   because a supported source key was not confirmed. A live credential-backed import has not run.
 - Next action: finish source-key verification if current official OpenAPI access becomes available,
-  then review CI on PR #5. The one-time athlete-data reset and explicit historical import remain
+  then complete remaining mapping/log-discard test coverage. The one-time athlete-data reset and explicit historical import remain
   pending; do not infer a historical range from `all` on an empty database.
 
 ## Pre-redesign state (historical)

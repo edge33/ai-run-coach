@@ -1,6 +1,6 @@
 # Minimal running data model: implementation tracker
 
-Approved: 2026-09-27. Status: phases 1, 3, and 4 implemented; phase 2 source verification and phase 5 final CI pending; deployment reset pending.
+Approved: 2026-09-27. Status: phases 1, 3, and 4 implemented; phase 2 source verification and remaining phase 5 coverage pending; deployment reset pending.
 
 This plan supersedes conflicting data-model, snapshot, backup/restore, and migration requirements
 in [implementation-plan.md](implementation-plan.md). Unrelated architecture and repository rules
@@ -21,7 +21,7 @@ remain in force. See [progress.md](progress.md) for repository state and validat
 | 2. Import and synchronization | In progress | Codex | Synthetic sync tests pass; current upstream OpenAPI field verification remains incomplete. |
 | 3. API, MCP, and web | Complete | Codex | Consumers and protocol tests use the new records. |
 | 4. Storage and operational cleanup | Complete | Codex | Snapshot/backup code removed; normalized export and disposable Compose lifecycle pass. |
-| 5. Automated validation | In progress | Codex | Local gates and Compose pass; await PR CI after push. |
+| 5. Automated validation | In progress | Codex | Local gates, Compose, and both PR CI jobs pass; remaining mapping/log-discard coverage is tracked below. |
 | 6. Data reset and manual import | Pending | Unassigned | — |
 
 Statuses: Pending, In progress, Blocked, Complete.
@@ -172,13 +172,14 @@ the wiki or unrelated applications.
 | 2026-09-27 | Codex / phases 1–4 | Add STRICT tables, runtime validation, date-boundary fix, normalized mappings, API/MCP/web consumers, export, and remove snapshot/backup code | Fresh database tests pass; source-activity IDs and wellness rows work through API/MCP; synthetic detail failure retains intervals and valid empty detail clears them | Run all gates and Compose |
 | 2026-09-27 | Codex / phase 5 | `npm run check`; `npm run typecheck`; `npm run lint`; `npm test`; `npm run build` | All pass locally. First sandbox test attempt closed MCP stdio subprocess; full suite passed outside sandbox. | Verify Compose and PR CI |
 | 2026-09-27 | Codex / phase 5 | `docker compose -p running-data-hub-validation config --quiet`; `up --build -d --wait`; `nginx -t`; `node scripts/compose-smoke.mjs`; `node scripts/compose-lifecycle.mjs`; `down -v` | All pass on disposable synthetic stack; its volumes removed. No athlete data or live credentials used. | Push to draft PR and review CI |
+| 2026-09-27 | Codex / CI | `git push`; `gh pr checks 5 --watch` | Both application jobs passed, including check, typecheck, lint, tests, build, Compose startup, smoke, lifecycle, and teardown. | Retain draft status pending source verification and deployment reset |
 
 For each implementation session, append commands and outcomes, including failures and checks not run.
 Do not mark a phase complete based only on code changes when its validation is still pending.
 
 ## Current handoff
 
-- Next action: push changes to draft PR #5 and review CI. Confirm current upstream keys/units with live official documentation or a credential-backed import before marking phase 2 complete.
+- Next action: confirm current upstream keys/units with live official documentation or a credential-backed import before marking phase 2 complete. Finish remaining mapping/log-discard test coverage and separately plan the data reset and historical import.
 - Known verification gap: current upstream activity maximum-power and elevation-loss keys were not confirmed; both remain null.
 - Deployment input still needed: explicit historical import range, unless supplied by later context.
 - Code changed on `feature/minimal-data-model`; no athlete data, reset, import, or merge was performed. The branch was pushed for draft PR #5.
