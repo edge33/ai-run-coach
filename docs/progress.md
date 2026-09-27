@@ -1,8 +1,34 @@
 # Running Data Hub progress
 
-Last updated: 2026-09-23
+Last updated: 2026-09-27
 
-## Current state
+## Minimal data model implementation
+
+- Approved plan and phase checklist: [minimal-data-model-plan.md](minimal-data-model-plan.md).
+  This supersedes the older snapshot, backup/restore, and data-model requirements in the original
+  architecture document. Use the tracker for phase status, acceptance checks, and execution evidence.
+- Decisions: fresh SQLite database with Kysely; minimal wellness/run/interval records; no snapshots,
+  backups, or legacy-data migration. Preserve configuration, credentials, and the athlete wiki.
+- Phase 1 is complete on `feature/minimal-data-model`, based on fetched `origin/main` at
+  `9b3aeb5`. The clean initial migration defines wellness, runs, run intervals, and operational
+  tables; shared contracts and database repositories use the new fields. The existing worktree
+  planning-document edits were preserved. No athlete database, reset, or import was touched.
+- `npm run check:fix`, `npm run test -w @hub/db` (3 passed), `npm run typecheck -w @hub/db`,
+  `npm run check`, and `git diff --check` passed. The database tests cover fresh and repeated
+  migration, FK and measurement constraints, upserts, lease exclusion, and interval rollback.
+- `npm run typecheck` fails in `@hub/core`: mapping, sync, summaries, backup, and old tests still
+  use removed schema fields and methods. This is the expected phase 2–4 integration gap. Full
+  tests and build were not run. The application should not be run against a fresh database until
+  those phases are complete.
+- Documentation validation: `git diff --check` passed. A Python check verified 34 pending checklist
+  items, linked document existence, and no trailing whitespace in the new tracker. The first check
+  incorrectly expected 32 items; correcting that assertion to the actual 34 passed. Application
+  tests were not run for this documentation-only change.
+- Next recommended action: implement phase 2 ingestion and synchronization, verifying upstream
+  mappings before completion; then update API, MCP, web, and operational consumers. Record a manual
+  historical import range before the final import.
+
+## Pre-redesign state (historical)
 
 - Active branch: `refactor/readable-modules`, created from fetched `origin/main` (`9410b58`).
   Published as [PR #4](https://github.com/edge33/ai-run-coach/pull/4) against `main`; no merge
@@ -84,8 +110,8 @@ Validated this readability refactor on 2026-09-23 with Node 24.21.0 and npm 11.1
   service recreation, shared SQLite, integrity, port isolation, and coordinated backup/restore.
 - `TAILSCALE_IP=127.0.0.1 docker compose -p running-data-hub-validation down -v` removed the
   disposable validation stack and synthetic-data volumes. No athlete data was used.
-- Next recommended action: review the refactor PR against `main` using `docs/code-map.md`
-  and its CI results. Local validation passed; the GitHub workflow also runs Compose checks.
+- Previous recommendation was to review the refactor PR against `main`; the current next action
+  is the minimal-model tracker above. No push or merge is authorized by this documentation task.
 
 ## Environment-dependent follow-up
 

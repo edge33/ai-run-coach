@@ -1,5 +1,10 @@
 # Running Data Hub implementation plan
 
+> Approved revision (2026-09-27): follow
+> [Minimal running data model: implementation tracker](minimal-data-model-plan.md) for the next
+> implementation. It supersedes conflicting data-model, snapshot, backup/restore, and migration
+> requirements below. The remaining architecture still applies; the redesign is not yet implemented.
+
 ## Purpose
 
 Build a personal running-data hub that manually imports completed runs and health data from
