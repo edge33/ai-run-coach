@@ -20,6 +20,9 @@ Last updated: 2026-09-27
   use removed schema fields and methods. This is the expected phase 2–4 integration gap. Full
   tests and build were not run. The application should not be run against a fresh database until
   those phases are complete.
+- Draft [PR #5](https://github.com/edge33/ai-run-coach/pull/5) is open against `main`. Both
+  application CI jobs failed at `npm run typecheck` with the same old-schema references. Keep
+  the PR in draft while completing the dependent phases.
 - Documentation validation: `git diff --check` passed. A Python check verified 34 pending checklist
   items, linked document existence, and no trailing whitespace in the new tracker. The first check
   incorrectly expected 32 items; correcting that assertion to the actual 34 passed. Application

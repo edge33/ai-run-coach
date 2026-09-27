@@ -155,6 +155,7 @@ the wiki or unrelated applications.
 | 2026-09-27 | Codex / phase 1 | `git fetch origin main`; `git switch -c feature/minimal-data-model origin/main` | Fetched `9b3aeb5` and branched from it; preserved existing uncommitted plan edits | Replace contracts and database |
 | 2026-09-27 | Codex / phase 1 | `npm run check:fix`; `npm run test -w @hub/db`; `npm run typecheck -w @hub/db`; `npm run check`; `git diff --check` | All pass; 3 database tests cover repeat migration, FK and measurement constraints, upsert, leases, rollback | Update import and consumers |
 | 2026-09-27 | Codex / phase 1 | `npm run typecheck` | Fails in `@hub/core` because phase 2–4 mapping, summaries, sync, backup, and tests still refer to removed schema and methods. No full test/build run yet. | Implement phase 2, then update consumers |
+| 2026-09-27 | Codex / PR | `gh pr create --draft --base main --head feature/minimal-data-model`; `gh pr checks 5 --watch` | Draft PR #5 opened. Both application jobs failed at `npm run typecheck` with the same old-schema references seen locally. | Keep PR draft while completing phases 2–4 |
 
 For each implementation session, append commands and outcomes, including failures and checks not run.
 Do not mark a phase complete based only on code changes when its validation is still pending.
