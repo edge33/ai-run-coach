@@ -48,8 +48,9 @@ Last updated: 2026-11-09
 - The fresh SQLite migration now uses `STRICT` domain tables. Repository writes parse the shared
   Zod contracts, and run date queries include the maximum valid date. Source IDs, wellness rows,
   ordered intervals, nullable measurements, and same-day form follow the approved tracker.
-- Manual sync retains only normalized fields, handles detail failure without deleting intervals,
-  and does not run on reads. API, MCP, web, summaries, export, Compose, and lifecycle checks use the
+- Manual sync retains only normalized fields, skips activities whose detail fetch or validation
+  fails, preserves previously imported run records and intervals, and does not run on reads.
+  API, MCP, web, summaries, export, Compose, and lifecycle checks use the
   new model. Snapshot and backup/restore functionality and configuration have been removed.
 - `npm run check`, `npm run typecheck`, `npm run lint`, `npm test` (outside the sandbox for the MCP
   stdio subprocess), and `npm run build` pass locally. Database, core, API, MCP, and web tests pass.
@@ -61,9 +62,48 @@ Last updated: 2026-11-09
 - Upstream field evidence is recorded in the tracker. The official forum model supports wellness
   keys, activity speeds, and interval `max_watts`; run maximum power and elevation loss remain null
   because a supported source key was not confirmed. A live credential-backed import has not run.
-- Next action: finish source-key verification if current official OpenAPI access becomes available,
-  then complete remaining mapping/log-discard test coverage. The one-time athlete-data reset and explicit historical import remain
-  pending; do not infer a historical range from `all` on an empty database.
+- Next action: address the stale-coverage finding in the second adversarial review below, then
+  finish source-key verification if current official OpenAPI access becomes available and complete
+  remaining mapping/log-discard test coverage. The one-time athlete-data reset and explicit
+  historical import remain pending; do not infer a historical range from `all` on an empty database.
+
+## Adversarial review of draft PR #5
+
+- Reviewed the local `feature/minimal-data-model` head against fetched `origin/main` on
+  2026-09-27. `gh pr view 5 --repo edge33/ai-run-coach --json ...` could not connect to
+  `api.github.com`, so live PR metadata and comments were not inspected.
+- A disposable in-memory SQLite sync probe completed one import with detail-only distance and
+  heart rate, then repeated it with a sparse activity list row and a 404 detail response. The
+  second sync was `partial`, but the existing run's `distance_m` and `avg_hr_bpm` changed from
+  `5000`/`150` to null. The prior runs coverage row remained. Review finding: preserve valid
+  run measurements when detail retrieval fails.
+- A second disposable in-memory probe returned a list activity dated `2026-09-20` and same-ID
+  detail dated `2026-09-21`. The range sync saved the current detail date. The user confirmed
+  that this is acceptable, so the second review finding was withdrawn; no date check was added.
+- The detail-failure path was changed to record `DETAIL_UNAVAILABLE` and skip that activity
+  without saving its list row. Existing measurements, provenance, status, and intervals remain
+  unchanged; a new activity with unavailable detail is not inserted. The window remains partial.
+  The focused core test now covers both existing and new run IDs with 404 detail responses.
+  After the final test extension, `npm run test -w @hub/core` passed all 6 tests,
+  `npm run typecheck` passed all 6 TypeScript workspaces, `npm run check` checked 73 files,
+  and `npm run lint` passed all 7 workspaces. The full suite and Compose were not rerun for
+  this focused sync change.
+- No athlete data or persistent database was touched. Source verification, remaining mapping and
+  log-discard coverage, and the separate reset/import remain pending.
+
+## Second adversarial review
+
+- Reviewed the current worktree, including the uncommitted detail-failure fix, against fetched
+  `origin/main`. A disposable in-memory SQLite probe first synchronized an empty 2026-09-20 runs
+  window successfully, then returned a newly listed run whose detail request returned 404.
+- The second sync was `partial` and correctly skipped the new run, but `summarizeRuns` returned
+  `sample_size: 0`, distance `0`, and no warnings. The old runs coverage row remained and was
+  treated as full coverage despite the newer incomplete attempt. This can present an incomplete
+  range as a confident zero. No athlete data or persistent database was used.
+- Next action: make run-summary coverage and warnings account for newer partial attempts that
+  overlap an older completed coverage row, or invalidate the affected coverage when such an
+  attempt detects an unimported run. Add a regression test for the empty-success/new-run-404
+  sequence before treating the fix as complete.
 
 ## Pre-redesign state (historical)
 

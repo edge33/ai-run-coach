@@ -110,7 +110,8 @@ null. Current public OpenAPI access and a live credential-backed payload remain 
 - [x] Map only requested statistics; do not fetch streams or invent substitute maxima, loss, or speed.
 - [x] Validate retained fields and discard all other payload fields before persistence or logging.
 - [x] Upsert runs by source ID and wellness by date. Replace intervals transactionally only after a
-      valid detail response; failed detail requests preserve prior intervals and mark detail status.
+      valid detail response. On a failed detail request, record an issue and skip the activity,
+      preserving any prior run and intervals; the window remains partial.
 - [x] Preserve manual sync modes, bounded windows, retries, leases, coverage, and partial-failure
       behavior. A valid empty interval response clears old intervals; an unavailable response does not.
 
@@ -173,13 +174,18 @@ the wiki or unrelated applications.
 | 2026-09-27 | Codex / phase 5 | `npm run check`; `npm run typecheck`; `npm run lint`; `npm test`; `npm run build` | All pass locally. First sandbox test attempt closed MCP stdio subprocess; full suite passed outside sandbox. | Verify Compose and PR CI |
 | 2026-09-27 | Codex / phase 5 | `docker compose -p running-data-hub-validation config --quiet`; `up --build -d --wait`; `nginx -t`; `node scripts/compose-smoke.mjs`; `node scripts/compose-lifecycle.mjs`; `down -v` | All pass on disposable synthetic stack; its volumes removed. No athlete data or live credentials used. | Push to draft PR and review CI |
 | 2026-09-27 | Codex / CI | `git push`; `gh pr checks 5 --watch` | Both application jobs passed, including check, typecheck, lint, tests, build, Compose startup, smoke, lifecycle, and teardown. | Retain draft status pending source verification and deployment reset |
+| 2026-09-27 | Codex / review follow-up | Change detail-failure handling to skip activity writes; add 404 regression for existing and new runs | The prior run remains unchanged, the new run is absent, issues are recorded, and the window is partial. The date-shift review finding was withdrawn after user clarification. Validation results are in `docs/progress.md`. | Finish source-key and mapping/log-discard verification, then plan reset/import |
+| 2026-09-27 | Codex / second adversarial review | In-memory probe: successful empty 2026-09-20 run sync, then newly listed run with 404 detail | New run is skipped and the second sync is `partial`, but the old coverage row makes `summarizeRuns` return zero distance with no warning. No persistent data changed. | Make summary coverage reflect the newer incomplete attempt and add regression coverage |
 
 For each implementation session, append commands and outcomes, including failures and checks not run.
 Do not mark a phase complete based only on code changes when its validation is still pending.
 
 ## Current handoff
 
-- Next action: confirm current upstream keys/units with live official documentation or a credential-backed import before marking phase 2 complete. Finish remaining mapping/log-discard test coverage and separately plan the data reset and historical import.
+- Next action: address the second adversarial review finding on stale coverage after a partial
+  detail import. Then confirm current upstream keys/units with live official documentation or a
+  credential-backed import before marking phase 2 complete, finish remaining mapping/log-discard
+  test coverage, and separately plan the data reset and historical import.
 - Known verification gap: current upstream activity maximum-power and elevation-loss keys were not confirmed; both remain null.
 - Deployment input still needed: explicit historical import range, unless supplied by later context.
 - Code changed on `feature/minimal-data-model`; no athlete data, reset, import, or merge was performed. The branch was pushed for draft PR #5.

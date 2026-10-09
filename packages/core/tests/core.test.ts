@@ -99,7 +99,7 @@ test('mapping retains requested fields, zero, null, negative form, and interval 
   assert.equal(mapWellness({ id: '2026-09-20', ctl: 10 }).form_tsb, null);
 });
 
-test('manual sync is repeatable, captures edits, and preserves intervals after detail failure', async () => {
+test('manual sync captures edits and leaves runs unchanged after detail failure', async () => {
   const t = await setup();
   let distance = 5000;
   let failDetail = false;
@@ -111,13 +111,18 @@ test('manual sync is repeatable, captures edits, and preserves intervals after d
     assert.equal(url.origin, 'https://intervals.icu');
     if (url.pathname.endsWith('/activities'))
       return Response.json([
-        { ...activity, distance },
+        failDetail
+          ? { id: activity.id, type: activity.type, start_date_local: activity.start_date_local }
+          : { ...activity, distance },
+        ...(failDetail
+          ? [{ id: 'new-run', type: 'Run', start_date_local: activity.start_date_local }]
+          : []),
         { id: 'ride', type: 'Ride' },
       ]);
     if (url.pathname.endsWith('/wellness'))
       return Response.json([{ id: '2026-09-20', hrv: 42, ctl: 10, atl: 12 }]);
     return failDetail
-      ? new Response('', { status: 503 })
+      ? new Response('', { status: 404 })
       : Response.json({
           ...activity,
           distance,
@@ -151,12 +156,15 @@ test('manual sync is repeatable, captures edits, and preserves intervals after d
       { mode: 'range', start: '2026-09-20', end: '2026-09-20' },
       t.config.timezone,
     );
-    assert.equal(
-      (await executeSync(t.store, t.config, run.id, { fetch: fakeFetch })).status,
-      'partial',
+    const failed = await executeSync(t.store, t.config, run.id, { fetch: fakeFetch });
+    assert.equal(failed.status, 'partial');
+    assert.equal(failed.rejected, 2);
+    assert.deepEqual(await t.store.getRun('i123'), saved);
+    assert.equal(await t.store.getRun('new-run'), null);
+    assert.deepEqual(
+      (await t.store.issues(run.id)).map((issue) => issue.code),
+      ['DETAIL_UNAVAILABLE', 'DETAIL_UNAVAILABLE'],
     );
-    assert.equal((await t.store.getRun('i123'))?.intervals.length, 2);
-    assert.equal((await t.store.getRun('i123'))?.run.details_status, 'unavailable');
     failDetail = false;
     emptyDetail = true;
     const cleared = await beginSync(

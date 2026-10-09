@@ -140,22 +140,18 @@ export async function executeSync(
                   summary.start_date_local.slice(0, 10) > range.end
                 )
                   throw new Error('OUT_OF_RANGE');
-                let source: unknown = row;
-                let complete = false;
+                let mapped: ReturnType<typeof mapActivity>;
                 try {
                   const detail = await client.activity(summary.id);
                   const parsed = activitySchema.parse(detail);
                   if (parsed.id !== summary.id) throw new Error('ID_MISMATCH');
-                  source = { ...summary, ...parsed };
-                  mapActivity(source, true);
-                  complete = true;
+                  mapped = mapActivity({ ...summary, ...parsed }, true);
                 } catch {
                   rejectedInWindow++;
                   run.rejected++;
                   await store.issue(id, resource, 'DETAIL_UNAVAILABLE', summary.id);
-                  source = row;
+                  continue;
                 }
-                const mapped = mapActivity(source, complete);
                 await assertLease();
                 await store.saveRun(mapped.run, mapped.intervals);
               } else {
