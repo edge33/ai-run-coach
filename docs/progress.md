@@ -45,8 +45,12 @@ Last updated: 2026-11-09
 
 - Updated the existing root `AGENTS.md` on `docs/agent-handoff-guide` to reference the current
   minimal-model branch and tracker, validation commands, and machine-to-machine handoff rules.
-- This documentation branch starts at `d4d57ec`. The original worktree's uncommitted sync fix,
-  regression test, and tracker/progress changes were preserved and are not included in this branch.
+- The documentation branch starts at `d4d57ec`. At the user's request, all remaining sync fix,
+  regression test, and tracker/progress changes were committed as `8683e42` on
+  `feature/minimal-data-model`; the agent-guide commit was included there as `a138460`.
+- On 2026-10-09, `npm run test -w @hub/core` passed all 6 tests and `npm run check` passed
+  on 73 files; `npm run typecheck` passed all 6 TypeScript workspaces. The stale-coverage
+  finding remains pending; no full suite or Compose rerun was made.
 - Validation: `git diff --check` passed. No application tests were run for this documentation-only
   change. The implementation follow-up remains in the original worktree's tracker and progress log.
 
