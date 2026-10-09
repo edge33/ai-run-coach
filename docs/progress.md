@@ -41,6 +41,16 @@ Last updated: 2026-11-09
 - Next action: review the migration diff. No remaining migration blockers were found. No push,
   merge, production deployment, live sync, or athlete-data reset was performed.
 
+## Agent guide handoff
+
+- Updated the existing root `AGENTS.md` on `docs/agent-handoff-guide` to reference the current
+  minimal-model branch and tracker, validation commands, and machine-to-machine handoff rules.
+- This documentation branch starts at `d4d57ec`. The original worktree's uncommitted sync fix,
+  regression test, and tracker/progress changes were preserved and are not included in this branch.
+- Validation: `git diff --check` passed. No application tests were run for this documentation-only
+  change. The implementation follow-up remains in the original worktree's tracker and progress log.
+
+
 ## Minimal data model implementation
 
 - Branch: `feature/minimal-data-model`, based on fetched `origin/main` at `9b3aeb5`.
