@@ -58,7 +58,10 @@ Last updated: 2026-11-09
 ## Minimal data model implementation
 
 - Branch: `feature/minimal-data-model`, based on fetched `origin/main` at `9b3aeb5`.
-  Draft [PR #5](https://github.com/edge33/ai-run-coach/pull/5) remains open; no merge was performed.
+  [PR #5](https://github.com/edge33/ai-run-coach/pull/5) is merged, as verified on 2026-10-09.
+  Follow-up [PR #6](https://github.com/edge33/ai-run-coach/pull/6) contains the committed detail-failure
+  fix, regression test, agent guide, and handoff notes; CI is pending. No merge was performed by
+  this handoff session.
 - The fresh SQLite migration now uses `STRICT` domain tables. Repository writes parse the shared
   Zod contracts, and run date queries include the maximum valid date. Source IDs, wellness rows,
   ordered intervals, nullable measurements, and same-day form follow the approved tracker.
