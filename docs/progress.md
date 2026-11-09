@@ -2,6 +2,30 @@
 
 Last updated: 2026-11-09
 
+## PR #6 rebase onto current main
+
+- On 2026-11-09, rebased `feature/minimal-data-model` in
+  `/home/edge33/.paseo/worktrees/09hw1sxp/mellow-parrot` onto fetched `origin/main`
+  at `95040c1`. The earlier model implementation through `d4d57ec` is tree-identical
+  to squash commit `3acec09`; only the four follow-up commits were replayed.
+- Resolved the `docs/progress.md` conflict by retaining both the main-branch Node/pnpm
+  migration history and the PR handoff notes. Updated `AGENTS.md` validation instructions
+  to the inherited pnpm tooling. Historical commit references below describe pre-rebase state.
+- On Node 26.13.0 and pnpm 12.18.0, `pnpm install --frozen-lockfile`, `pnpm run check`
+  (72 files), `pnpm run typecheck` (6 workspaces), `pnpm run lint` (7 workspaces),
+  `pnpm test` (17 tests: database 4, core 6, API 1, MCP 3, web 3), and `pnpm run build`
+  all passed. Install and checks ran outside the sandbox after the initial sandbox install
+  failed to open the shared pnpm store lock. `git diff --check` passed.
+- Reviewed `git range-diff` against the original four commits: application and regression-test
+  changes are preserved; differences are limited to handoff context. Compose was not rerun.
+- The user explicitly approved publishing after automatic review initially blocked the push.
+  Publish with an explicit lease against verified original PR head
+  `1f2ff2316ea9a360a218b8fe97be0ad4f7f83352`.
+- Next action: verify the published PR #6 head and CI. The stale-coverage
+  finding, upstream field verification, remaining log-discard coverage, and separate reset/import
+  remain pending.
+  No merge, athlete-data access, reset, or live import was performed.
+
 ## Node 26 and pnpm migration
 
 - Follow-up work remains in `/home/edge33/.paseo/worktrees/09hw1sxp/roasted-penguin`
@@ -53,7 +77,6 @@ Last updated: 2026-11-09
   finding remains pending; no full suite or Compose rerun was made.
 - Validation: `git diff --check` passed. No application tests were run for this documentation-only
   change. The implementation follow-up remains in the original worktree's tracker and progress log.
-
 
 ## Minimal data model implementation
 

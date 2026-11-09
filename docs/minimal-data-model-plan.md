@@ -177,6 +177,8 @@ the wiki or unrelated applications.
 | 2026-09-27 | Codex / review follow-up | Change detail-failure handling to skip activity writes; add 404 regression for existing and new runs | The prior run remains unchanged, the new run is absent, issues are recorded, and the window is partial. The date-shift review finding was withdrawn after user clarification. Validation results are in `docs/progress.md`. | Finish source-key and mapping/log-discard verification, then plan reset/import |
 | 2026-09-27 | Codex / second adversarial review | In-memory probe: successful empty 2026-09-20 run sync, then newly listed run with 404 detail | New run is skipped and the second sync is `partial`, but the old coverage row makes `summarizeRuns` return zero distance with no warning. No persistent data changed. | Make summary coverage reflect the newer incomplete attempt and add regression coverage |
 
+| 2026-11-09 | Codex / PR #6 rebase | Rebase four follow-up commits onto `origin/main` (`95040c1`); `pnpm install --frozen-lockfile`; `pnpm run check`; `pnpm run typecheck`; `pnpm run lint`; `pnpm test`; `pnpm run build`; `git diff --check` | All gates pass on Node 26.13.0/pnpm 12.18.0, including all 17 tests. Retained migration and handoff notes; Compose not rerun. | Push explicitly approved by user; verify PR #6 head/CI, then address stale coverage; other tasks remain pending |
+
 For each implementation session, append commands and outcomes, including failures and checks not run.
 Do not mark a phase complete based only on code changes when its validation is still pending.
 

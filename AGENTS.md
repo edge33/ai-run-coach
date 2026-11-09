@@ -28,9 +28,9 @@ resume without conversation history.
 
 ## Validation and handoff
 
-- Use the Node and npm versions pinned in the repository. On a fresh checkout, run `npm ci`.
-- Run checks appropriate to the change. The full gates are `npm run check`, `npm run typecheck`,
-  `npm run lint`, `npm test`, and `npm run build`; Compose validation commands are in
+- Use the Node and pnpm versions pinned in the repository. On a fresh checkout, run `pnpm install --frozen-lockfile`.
+- Run checks appropriate to the change. The full gates are `pnpm run check`, `pnpm run typecheck`,
+  `pnpm run lint`, `pnpm test`, and `pnpm run build`; Compose validation commands are in
   `docs/progress.md`. Use only disposable synthetic data for validation.
 - Update the minimal-model tracker when its checklist, blockers, or next action changes.
 - Distinguish implementation completion from deployment reset and historical import. Never infer
