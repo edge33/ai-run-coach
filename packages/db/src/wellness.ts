@@ -18,12 +18,10 @@ export class WellnessRepository {
       .execute();
   }
 
-  async listWellness(range: DateRange, limit = 50, offset = 0) {
-    validateRange(range);
-    const base = this.db
-      .selectFrom('wellness')
-      .where('date', '>=', range.start)
-      .where('date', '<=', range.end);
+  async listWellness(range?: DateRange, limit = 50, offset = 0) {
+    if (range) validateRange(range);
+    let base = this.db.selectFrom('wellness');
+    if (range) base = base.where('date', '>=', range.start).where('date', '<=', range.end);
     const items = await base
       .selectAll()
       .orderBy('date', 'desc')

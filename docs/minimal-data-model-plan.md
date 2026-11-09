@@ -47,8 +47,8 @@ sequence and boolean storage use `INTEGER`.
 | Table | Domain fields |
 | --- | --- |
 | `wellness` | `date` primary key; `resting_hr_bpm`, `hrv_ms`, `sleep_duration_s`, `weight_kg`, `fitness_ctl`, `fatigue_atl`, `form_tsb`, `training_load` |
-| `runs` | `id` primary key containing the Intervals.icu activity ID; `start_time`, `indoor`, `distance_m`, `duration_s`, `moving_time_s`, `avg_speed_mps`, `max_speed_mps`, `avg_hr_bpm`, `max_hr_bpm`, `avg_power_w`, `max_power_w`, `elevation_gain_m`, `elevation_loss_m`, `avg_cadence_rpm`, `training_load` |
-| `run_intervals` | `run_id`, `sequence`, `interval_type`, `duration_s`, `distance_m`, `avg_speed_mps`, `max_speed_mps`, `avg_hr_bpm`, `max_hr_bpm`, `avg_power_w`, `max_power_w`, `elevation_gain_m`, `elevation_loss_m`, `avg_cadence_rpm` |
+| `runs` | `id` primary key containing the Intervals.icu activity ID; `start_time`, `indoor`, `distance_m`, `duration_s`, `moving_time_s`, `avg_speed_mps`, `max_speed_mps`, `avg_hr_bpm`, `max_hr_bpm`, `avg_power_w`, `elevation_gain_m`, `elevation_loss_m`, `avg_cadence_rpm`, `training_load` |
+| `run_intervals` | `run_id`, `sequence`, `interval_type`, `duration_s`, `distance_m`, `avg_speed_mps`, `max_speed_mps`, `avg_hr_bpm`, `max_hr_bpm`, `avg_power_w`, `max_power_w`, `elevation_gain_m`, `avg_cadence_rpm` |
 
 - Interval primary key is `(run_id, sequence)`, with a cascading foreign key to `runs`.
   Sequence follows upstream array order, starting at zero.
@@ -86,8 +86,16 @@ interval `max_watts`. The [developer's interval API example](https://forum.inter
 confirms `icu_intervals`, work/recovery type, elapsed time, speed, HR, power, and elevation gain.
 The [developer-published wellness model](https://forum.intervals.icu/t/server-side-data-model-for-scripts/25781/16)
 lists `restingHR`, `hrv`, `sleepSecs`, `weight`, `ctl`, `atl`, and `ctlLoad`.
-The reviewed model does not establish activity maximum power or elevation loss keys; both remain
-null. Current public OpenAPI access and a live credential-backed payload remain unverified.
+On 2026-11-09, the [current public OpenAPI schema](https://intervals.icu/api/v1/docs) was accessible.
+`Activity` includes `icu_average_watts` (integer watts) and `total_elevation_loss` (numeric meters),
+but no activity maximum-power field. `Interval` includes `average_watts`/`max_watts`, but no elevation
+loss field. The importer now maps activity `total_elevation_loss` to `elevation_loss_m`; activity
+maximum power and interval elevation loss are excluded from the persisted schema and contracts.
+Migration `002_remove_unsupported_measurements` removes these columns from existing databases,
+while leaving `001_initial` immutable. Read-only credential-backed field-presence
+checks confirmed numeric activity elevation loss and null average power in sampled responses, despite
+watts-stream availability. No stream data was fetched or substitute statistics calculated.
+Verification of every other retained field remains pending.
 
 ## Implementation checklist
 
@@ -103,8 +111,8 @@ null. Current public OpenAPI access and a live credential-backed payload remain 
 ### 2. Import and synchronization
 
 - [ ] Verify current upstream keys and units for every retained measurement, especially run maximum
-      power and elevation loss. Public OpenAPI access failed during planning; record verification
-      evidence here. Unsupported or absent fields remain null.
+      fields against current public OpenAPI and record verification evidence here. Run maximum
+      power and interval elevation loss are now excluded; absent supported measurements remain null.
 - [x] Accept only `Run`, `TrailRun`, and `VirtualRun`; implement the wellness mapping above.
 - [x] Import ordered `icu_intervals`, including work and recovery, with nullable upstream type text.
 - [x] Map only requested statistics; do not fetch streams or invent substitute maxima, loss, or speed.
@@ -199,8 +207,113 @@ Do not mark a phase complete based only on code changes when its validation is s
   detail import. Then confirm current upstream keys/units with live official documentation or a
   credential-backed import before marking phase 2 complete, finish remaining mapping/log-discard
   test coverage, and separately plan the data reset and historical import.
-- Known verification gap: current upstream activity maximum-power and elevation-loss keys were not confirmed; both remain null.
+- Field verification follow-up: public OpenAPI now confirms activity elevation loss; its mapping is
+  implemented below. Activity maximum power has no corresponding field in the reviewed schema and
+  has been removed from the current schema. Verification of all retained measurements is still incomplete.
 - Deployment input still needed: explicit historical import range, unless supplied by later context.
 - Earlier minimal-model work is included in main through PR #6 at `a0a8f61`. This API
   simplification is being updated in PR #10 following the request-bound sync instruction. No athlete data,
   reset, or import was performed.
+
+### 2026-11-09: single-page UI simplification
+
+- User superseded the multi-view web design with one plain page: a recent-sync button and paginated
+  run/health lists. The last 30 local dates are displayed; recent sync imports 30 dates. Removed
+  navigation, overview, detail screens, charts, summaries, and sync-history/options UI.
+- Phase 3 remains implemented; API/MCP, schema, and importer behavior are unchanged. Range/historical
+  import remains available through the CLI. Focused web tests pass; see progress.md for full gates.
+- Full gates pass on Node 26.13.0 / pnpm 12.18.0: check, typecheck, lint, 24 tests, build,
+  and diff whitespace validation. The full suite required a rerun outside the sandbox for local
+  sockets/subprocesses. Docker/Compose and browser checks were not rerun.
+- Next action: review this UI change. Existing source-verification,
+  discarded-field coverage, stale-summary-coverage, and separate deployment/import follow-ups remain.
+
+### 2026-11-09: latest 30-day sync
+
+- Recent sync and the empty-history fallback now request 30 inclusive local dates instead of 14,
+  matching the single-page list window. Explicit ranges and reconciliation of existing imported
+  ranges are unchanged. Added synthetic run/health request-boundary coverage across month/DST changes.
+- Validation passed: `pnpm run check`, `pnpm run typecheck`, focused core/web suites (14 tests),
+  `pnpm run build`, and `git diff --check`. No full-suite/browser/Compose rerun for this follow-up.
+- Next action: review this follow-up with the single-page UI. Existing deferred work above remains
+  separate; no live import, deployment reset, or athlete-data access was performed.
+
+### 2026-11-09: date pickers and bounded selections
+
+- Latest user instruction supersedes the 30-day default: use start/end pickers defaulting to 15
+  inclusive local dates. Date selection controls plain local lists and explicit range sync. Maximum
+  three months is defined/displayed as 90 inclusive dates and enforced in the UI and core/API.
+- Recent and empty-history defaults also use 15 dates. Explicit range sync rejects oversized,
+  reversed, and future ranges before taking the lease or contacting upstream. Existing-history
+  reconciliation stays windowed; longer historical imports require multiple explicit ranges.
+- Added UI/API/core boundary coverage and strengthened overlapping-sync regression to check run
+  and wellness updates without duplicates. All gates pass: check, typecheck, lint, 27 tests, build,
+  and diff whitespace validation. Full tests ran outside the sandbox for sockets/subprocesses;
+  browser/Compose checks were not run.
+- Next action: review accumulated changes. Deferred upstream verification,
+  discarded-field coverage, stale-summary coverage, and deployment/reset/import remain separate.
+
+### 2026-11-09: missing power and elevation-loss investigation
+
+- Confirmed run maximum power and elevation loss were hardcoded null. Average power correctly
+  maps `icu_average_watts`; sampled upstream responses return null despite watts-stream availability.
+- Public OpenAPI now verifies activity `total_elevation_loss`; mapped it without changing storage.
+  Activity maximum power and interval elevation loss have no corresponding fields in the reviewed
+  schemas, so remain null. No streams, inferred statistics, or substitute maxima were introduced.
+- Read-only diagnostics used configured SQLite and upstream GETs, printing only aggregate counts,
+  field-presence/type metadata, and power availability flags. No raw payloads or measurements were
+  retained. No sync or data writes occurred. Previous synthetic-only statements describe earlier work.
+- Added synthetic positive/zero/missing/invalid elevation-loss and average-power mapping checks,
+  plus persistence assertions. `pnpm run check`, `pnpm run typecheck`, focused core tests (9), and
+  `git diff --check` pass. No full-suite/build/browser/Compose rerun for this mapping-only follow-up.
+- Next action: review the mapping; after deployment, user-triggered sync can populate elevation loss.
+  Investigate upstream running power configuration/processing for null average power; no settings
+  were changed and no athlete records were written. All changes remain uncommitted on `clumsy-mole`
+  at HEAD `baba1812`, alongside the earlier UI/date changes.
+
+### 2026-11-09: browse all stored records independently of sync dates
+
+- Latest UI instruction supersedes selection-controlled lists: start/end dates affect sync only.
+  Runs and wellness always browse all stored records, newest first, on separate 50-entry pages.
+  Changing valid/invalid sync dates preserves visible lists and page offsets.
+- HTTP lists accept optional paired dates and cap pages at 50; omitted dates read all records.
+  Store repositories support optional ranges. MCP date-bounded contracts remain unchanged.
+- Synthetic API/UI regressions cover older records, independent pagination, the 50-entry cap,
+  unchanged lists after date edits, and no sync on reads. All gates pass: check, typecheck, lint,
+  28 tests, build, and diff whitespace validation. Browser/Compose checks were not run.
+- Next action: review accumulated uncommitted changes on `clumsy-mole` at HEAD `baba1812`.
+  No blockers or live sync/data access for this follow-up.
+
+### 2026-11-09: interval power/elevation follow-up
+
+- Read-only checks of stored intervals and three upstream activity details confirm sampled interval
+  `average_watts`/`max_watts` are null and `total_elevation_loss` is absent. Existing interval
+  average/max power mappings are correct. Interval loss remains null because no upstream value
+  is supplied; unlike activity loss there is no confirmed interval loss key to add.
+- Added synthetic mapping/persistence assertions for interval power values, zeros, null/missing
+  fields, and negative-value validation. No production code or athlete records changed. Only
+  aggregate/type/presence diagnostic metadata was printed; raw payloads were not retained.
+- `pnpm run check`, focused core tests (9), core typecheck, and `git diff --check` pass.
+  Full-suite/build/browser/Compose checks were not repeated for this test/documentation follow-up.
+- Next action: review regressions, then upstream power processing follow-up if desired. Changes
+  remain uncommitted on `clumsy-mole` at `baba1812`. No stream derivation, source changes,
+  live sync, push, merge, or deployment.
+
+### 2026-11-09: remove unsupported measurements and migrate
+
+- User approved removing `runs.max_power_w` and `run_intervals.elevation_loss_m`. Contracts,
+  source mapping, repository projections, and fixtures now omit them. Run elevation loss and
+  interval average/max power remain supported. API/MCP responses and normalized export follow
+  the revised contracts/schema.
+- Added immutable migration `002_remove_unsupported_measurements` using SQLite DROP COLUMN;
+  left `001_initial` unchanged. Fresh installs apply both; existing installations apply only 002.
+  No reset or upstream re-sync is needed to drop these unsupported columns. Apply migrations before
+  starting updated services. This is distinct from the separately pending historical deployment reset.
+- Synthetic tests cover fresh/repeated migrations, upgrade from a populated 001 database, retained
+  records/measurements/leases, indexes, STRICT tables, FK checks/cascades, and export field removal.
+- Database tests pass (5). An initial export assertion used the wrong array key; corrected to the
+  existing `intervals` export key. All gates now pass: check (68 files), typecheck, lint, 29 tests,
+  build, and diff whitespace validation. Full tests ran outside the sandbox; browser/Compose checks
+  were not run. No athlete database was migrated.
+- User authorized publishing accumulated changes as a PR. Next action: publish/review PR and CI;
+  deploy code with `pnpm run migrate` before service startup. No merge is authorized.

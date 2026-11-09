@@ -44,7 +44,7 @@ export class Store {
     await this.db.selectFrom('runs').select('id').limit(1).execute();
   }
 
-  async listRuns(range: DateRange, limit = 50, offset = 0) {
+  async listRuns(range?: DateRange, limit = 50, offset = 0) {
     return this.runs.listRuns(range, limit, offset);
   }
 
@@ -60,7 +60,7 @@ export class Store {
     return this.wellness.saveWellness(row);
   }
 
-  async listWellness(range: DateRange, limit = 50, offset = 0) {
+  async listWellness(range?: DateRange, limit = 50, offset = 0) {
     return this.wellness.listWellness(range, limit, offset);
   }
 

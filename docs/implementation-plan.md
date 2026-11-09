@@ -20,7 +20,7 @@ Use a Turborepo with pnpm workspaces and pinned dependencies:
 
 ```text
 apps/
-  web/          Vite, React, React Router, TanStack Query
+  web/          Vite, React, TanStack Query
   api/          Fastify HTTP API and request-bound manual sync
   mcp/          Shared MCP tools over stdio and Streamable HTTP
 packages/
@@ -49,6 +49,11 @@ Persist:
 - daily wellness rows with the approved measurements and units;
 - minimal sync runs, issues, coverage, and writer leases.
 
+Do not persist unsupported run maximum power or interval elevation loss. Keep run elevation loss
+and interval average/maximum power when provided. Migration `002_remove_unsupported_measurements`
+drops only the unsupported columns from existing databases; apply migrations before updated services
+start. The initial migration remains immutable, and fresh databases apply both migrations.
+
 Do not persist training periods, calendar events, readiness scores, coaching proposals, or generated
 plans. Calculate only simple deterministic summaries on demand: run totals, aggregate pace from
 qualifying distance/time pairs, and count/minimum/maximum/mean for a single health metric. Always
@@ -56,8 +61,8 @@ return units, date bounds, sample counts, missingness, provenance, and synchroni
 
 Synchronization is exclusively user-triggered:
 
-- recent: refresh the last 14 local dates;
-- range: refresh an explicitly selected date range;
+- recent: refresh the last 15 local dates;
+- range: refresh an explicitly selected date range of at most 90 inclusive local dates;
 - all: reconcile all previously imported ranges.
 
 Use bounded 90-day request windows, end-to-end timeouts, bounded retry/backoff with `Retry-After`,
@@ -85,14 +90,31 @@ new evidence is required.
 
 ## Web application and API
 
-The Vite React app contains Overview, Runs, Health, and Synchronization views. It uses local API reads,
-explicit query refresh, and a sync icon that starts an import only when clicked. Keep the request
-open until the import finishes, disable competing sync controls while waiting, then show the outcome
-and refresh local queries. Disable polling and automatic focus/reconnect refetches. Clearly distinguish
-loading, empty, missing, incomplete, and failed states.
+The Vite React app is a single plain page with start/end date pickers, a Sync button, a run list,
+and a daily health list. Default sync to the latest 15 local dates, including today. The selection controls
+explicit range sync only. Both lists always browse all stored records, newest first, independently
+paginated with at most 50 entries per page. Label the maximum as three months (90 inclusive days);
+block invalid, reversed, future, or oversized selections and enforce the same range limit in core
+before acquiring a lease or contacting upstream. Disable date controls while syncing. Changing
+sync dates leaves both lists and their pagination unchanged; importing requires clicking Sync.
+
+Runs display distance, moving time, and average heart rate; health rows display resting heart rate,
+HRV, sleep, and weight. Missing measurements remain explicit. Navigation, charts, summaries, run
+details, and sync-history screens are removed. The button waits for the import outcome, then
+refreshes both lists. Range imports via API/CLI share the 90-day cap; historical imports can be
+split into explicit ranges. `all` retains reconciliation of existing history using bounded windows.
+Disable polling and automatic focus/reconnect refetches. Clearly distinguish loading, empty,
+missing, and failed states, and show partial sync outcomes.
+
+Overlapping imports upsert runs by activity ID and health by date, updating existing measurements
+without duplicates. Valid run details replace intervals transactionally; failed detail requests
+preserve the stored run and intervals. Missing upstream records are not automatically deleted.
+Only one sync writer is allowed at a time, including requests for different ranges.
 
 Fastify provides bounded, schema-validated endpoints for runs, run details, health observations,
-summaries, data status, and manual sync/history/details. `POST /api/sync-runs` executes the import
+summaries, data status, and manual sync/history/details. Run and health list endpoints accept
+optional paired start/end dates; omitting both returns all stored records with pagination and a
+maximum page size of 50. Existing date-filtered reads remain supported. `POST /api/sync-runs` executes the import
 inside the request and returns `200` with its final sync record, including completed, partial, failed,
 or interrupted status. There are no background import tasks or progress streams. A competing request
 returns `409` with the active sync. Client disconnection or API shutdown cancels upstream requests

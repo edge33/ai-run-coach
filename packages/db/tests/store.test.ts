@@ -4,7 +4,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import type { RunInterval } from '@hub/contracts';
+import { Migrator } from 'kysely/migration';
 import { type RunRow, Store } from '../src/index.ts';
+import { initialMigration } from '../src/migrations/001_initial.ts';
 
 function run(id = 'run-one'): RunRow {
   return {
@@ -19,7 +21,6 @@ function run(id = 'run-one'): RunRow {
     avg_hr_bpm: null,
     max_hr_bpm: null,
     avg_power_w: null,
-    max_power_w: null,
     elevation_gain_m: null,
     elevation_loss_m: null,
     avg_cadence_rpm: null,
@@ -42,7 +43,6 @@ function interval(): RunInterval {
     avg_power_w: null,
     max_power_w: null,
     elevation_gain_m: null,
-    elevation_loss_m: null,
     avg_cadence_rpm: null,
   };
 }
@@ -58,6 +58,18 @@ test('fresh migration is repeatable and enforces the minimal schema', async () =
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
       .all() as { name: string }[];
     assert(tables.some((table) => table.name === 'wellness'));
+    const runColumns = api.sqlite.pragma('table_info(runs)') as { name: string }[];
+    const intervalColumns = api.sqlite.pragma('table_info(run_intervals)') as { name: string }[];
+    assert.equal(
+      runColumns.some((column) => column.name === 'max_power_w'),
+      false,
+    );
+    assert.equal(
+      intervalColumns.some((column) => column.name === 'elevation_loss_m'),
+      false,
+    );
+    assert.ok(runColumns.some((column) => column.name === 'elevation_loss_m'));
+    assert.ok(intervalColumns.some((column) => column.name === 'max_power_w'));
     assert(
       !tables.some((table) => ['health_days', 'health_values', 'snapshots'].includes(table.name)),
     );
@@ -153,6 +165,67 @@ test('failed interval replacement rolls back the run', async () => {
     const result = await store.getRun('run-one');
     assert.equal(result?.run.distance_m, 5000);
     assert.equal(result?.intervals.length, 1);
+  } finally {
+    await store.close();
+  }
+});
+
+test('upgrade removes only unsupported columns and preserves records, indexes, strict tables, and foreign keys', async () => {
+  const store = new Store(':memory:');
+  try {
+    const migrator = new Migrator({
+      db: store.db,
+      provider: { getMigrations: async () => ({ '001_initial': initialMigration }) },
+    });
+    const initial = await migrator.migrateToLatest();
+    assert.ifError(initial.error);
+    store.sqlite
+      .prepare(`INSERT INTO runs
+      (id, start_time, synced_at, details_status, avg_power_w, elevation_loss_m, max_power_w)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run('run-one', '2026-09-20T08:00:00', '2026-09-20T10:00:00Z', 'complete', 220, 65, null);
+    store.sqlite
+      .prepare(`INSERT INTO run_intervals
+      (run_id, sequence, avg_power_w, max_power_w, elevation_loss_m) VALUES (?, ?, ?, ?, ?)`)
+      .run('run-one', 0, 250, 400, null);
+    store.sqlite
+      .prepare('INSERT INTO wellness (date, resting_hr_bpm, synced_at) VALUES (?, ?, ?)')
+      .run('2026-09-20', 0, '2026-09-20T10:00:00Z');
+    store.sqlite
+      .prepare('INSERT INTO leases (name, owner, expires_at) VALUES (?, ?, ?)')
+      .run('writer', 'synthetic-owner', 1000);
+    const expectedRun = store.sqlite.prepare('SELECT * FROM runs').get() as Record<string, unknown>;
+    const expectedInterval = store.sqlite.prepare('SELECT * FROM run_intervals').get() as Record<
+      string,
+      unknown
+    >;
+    const expectedWellness = store.sqlite.prepare('SELECT * FROM wellness').get();
+    const expectedLease = store.sqlite.prepare('SELECT * FROM leases').get();
+    delete expectedRun.max_power_w;
+    delete expectedInterval.elevation_loss_m;
+
+    await store.migrate();
+    await store.migrate();
+
+    const saved = await store.getRun('run-one');
+    assert.deepEqual(saved?.run, expectedRun);
+    assert.deepEqual(saved?.intervals, [expectedInterval]);
+    assert.deepEqual(store.sqlite.prepare('SELECT * FROM wellness').get(), expectedWellness);
+    assert.deepEqual(store.sqlite.prepare('SELECT * FROM leases').get(), expectedLease);
+    assert.equal(store.sqlite.prepare('SELECT * FROM kysely_migration').all().length, 2);
+    const indexes = store.sqlite.pragma('index_list(runs)') as { name: string }[];
+    assert.ok(indexes.some((index) => index.name === 'runs_start_time_id_idx'));
+    const tables = store.sqlite.pragma('table_list') as { name: string; strict: number }[];
+    assert.equal(tables.find((table) => table.name === 'runs')?.strict, 1);
+    assert.equal(tables.find((table) => table.name === 'run_intervals')?.strict, 1);
+    assert.deepEqual(store.sqlite.pragma('foreign_key_check'), []);
+    assert.throws(() =>
+      store.sqlite
+        .prepare('INSERT INTO run_intervals (run_id, sequence) VALUES (?, ?)')
+        .run('missing', 0),
+    );
+    store.sqlite.prepare('DELETE FROM runs WHERE id = ?').run('run-one');
+    assert.equal(store.sqlite.prepare('SELECT * FROM run_intervals').all().length, 0);
   } finally {
     await store.close();
   }

@@ -1,12 +1,8 @@
-import type { DateRange } from '@hub/contracts';
 import type { ReactNode } from 'react';
 
 export function Empty({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="empty">
-      <span className="empty-mark" aria-hidden="true">
-        ↗
-      </span>
       <h3>{title}</h3>
       <p>{children}</p>
     </div>
@@ -18,40 +14,6 @@ export function ErrorNotice({ error }: { error: Error | null }) {
       {error.message}
     </p>
   ) : null;
-}
-export function DateFilter({
-  range,
-  onChange,
-}: {
-  range: DateRange;
-  onChange: (range: DateRange) => void;
-}) {
-  return (
-    <div className="date-filter">
-      <label>
-        From
-        <input
-          type="date"
-          value={range.start}
-          max={range.end}
-          onChange={(event) => {
-            if (event.target.value) onChange({ ...range, start: event.target.value });
-          }}
-        />
-      </label>
-      <label>
-        To
-        <input
-          type="date"
-          value={range.end}
-          min={range.start}
-          onChange={(event) => {
-            if (event.target.value) onChange({ ...range, end: event.target.value });
-          }}
-        />
-      </label>
-    </div>
-  );
 }
 export function Pagination({
   total,

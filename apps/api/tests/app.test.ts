@@ -4,6 +4,7 @@ import { request as httpRequest } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { addDays } from '@hub/contracts';
 import { loadConfig, mapActivity, mapWellness } from '@hub/core';
 import { Store } from '@hub/db';
 import { buildApp } from '../src/app.ts';
@@ -166,6 +167,21 @@ test('UI sync waits for import completion and rejects competing imports', async 
   };
 
   try {
+    for (const range of [
+      { start: '2026-01-01', end: '2026-04-01' },
+      { start: '2026-09-21', end: '2026-09-20' },
+    ]) {
+      const invalid = await app.inject({
+        method: 'POST',
+        url: '/api/sync-runs',
+        payload: { mode: 'range', ...range },
+      });
+      assert.equal(invalid.statusCode, 400);
+      assert.equal(invalid.json().error, 'INVALID_INPUT');
+    }
+    assert.equal(requested.length, 0);
+    assert.equal(await store.activeSync(), null);
+
     const payload = { mode: 'range', start: '2026-09-20', end: '2026-09-20' };
     let finished = false;
     const importing = app
@@ -346,6 +362,59 @@ test('disconnecting the UI request cancels its import', async () => {
   } finally {
     await app.close();
     globalThis.fetch = originalFetch;
+    await store.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test('all stored runs and wellness are paginated without dates, capped at 50, and read locally', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'hub-api-lists-'));
+  const config = loadConfig({
+    SQLITE_PATH: join(dir, 'db.sqlite'),
+    APP_ORIGINS: 'http://localhost',
+  });
+  const store = new Store(config.databasePath);
+  await store.migrate();
+  const app = buildApp(store, config);
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    throw new Error('Unexpected upstream request');
+  };
+  try {
+    for (let index = 0; index < 52; index++) {
+      const date = index === 0 ? '1990-01-01' : addDays('2026-09-01', index);
+      const mapped = mapActivity(
+        { id: `synthetic-${index}`, type: 'Run', start_date_local: `${date}T08:00:00` },
+        false,
+      );
+      await store.saveRun(mapped.run, mapped.intervals);
+      await store.saveWellness(mapWellness({ id: date }));
+    }
+    for (const path of ['/api/runs', '/api/health']) {
+      const first = await app.inject({ url: path });
+      assert.equal(first.statusCode, 200);
+      assert.equal(first.json().total, 52);
+      assert.equal(first.json().items.length, 50);
+      assert.equal(first.json().limit, 50);
+      const second = await app.inject({ url: `${path}?limit=50&offset=50` });
+      assert.equal(second.statusCode, 200);
+      assert.equal(second.json().total, 52);
+      assert.equal(second.json().items.length, 2);
+      const items = [...first.json().items, ...second.json().items];
+      assert.equal(new Set(items.map((item) => item.id ?? item.date)).size, 52);
+      assert.equal((items.at(-1).start_time ?? items.at(-1).date).slice(0, 10), '1990-01-01');
+      assert.equal((await app.inject({ url: `${path}?limit=51` })).statusCode, 400);
+      assert.equal((await app.inject({ url: `${path}?start=2026-09-01` })).statusCode, 400);
+      const filtered = await app.inject({ url: `${path}?start=1990-01-01&end=1990-01-01` });
+      assert.equal(filtered.statusCode, 200);
+      assert.equal(filtered.json().total, 1);
+    }
+    assert.equal(calls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await app.close();
     await store.close();
     await rm(dir, { recursive: true });
   }

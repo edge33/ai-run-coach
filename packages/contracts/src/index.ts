@@ -20,6 +20,16 @@ export const pageSchema = rangeSchema.extend({
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).max(100000).default(0),
 });
+export const recordListQuerySchema = pageSchema
+  .partial({ start: true, end: true })
+  .extend({ limit: z.coerce.number().int().min(1).max(50).default(50) })
+  .refine((query) => (query.start === undefined) === (query.end === undefined), {
+    message: 'Provide both start and end, or neither.',
+  });
+
+export const DEFAULT_SYNC_DAYS = 15;
+export const MAX_SYNC_DAYS = 90;
+
 export const syncRequestSchema = z.discriminatedUnion('mode', [
   z.object({ mode: z.literal('recent') }).strict(),
   z.object({ mode: z.literal('all') }).strict(),
@@ -52,7 +62,6 @@ export const runSchema = z.object({
   avg_hr_bpm: measurement,
   max_hr_bpm: measurement,
   avg_power_w: measurement,
-  max_power_w: measurement,
   elevation_gain_m: measurement,
   elevation_loss_m: measurement,
   avg_cadence_rpm: measurement,
@@ -74,7 +83,6 @@ export const intervalSchema = z.object({
   avg_power_w: measurement,
   max_power_w: measurement,
   elevation_gain_m: measurement,
-  elevation_loss_m: measurement,
   avg_cadence_rpm: measurement,
 });
 export type RunInterval = z.infer<typeof intervalSchema>;

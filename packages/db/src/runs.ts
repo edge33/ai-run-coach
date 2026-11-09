@@ -12,7 +12,6 @@ export const runColumns = [
   'avg_hr_bpm',
   'max_hr_bpm',
   'avg_power_w',
-  'max_power_w',
   'elevation_gain_m',
   'elevation_loss_m',
   'avg_cadence_rpm',
@@ -33,7 +32,6 @@ const intervalColumns = [
   'avg_power_w',
   'max_power_w',
   'elevation_gain_m',
-  'elevation_loss_m',
   'avg_cadence_rpm',
 ] as const;
 
@@ -47,13 +45,11 @@ export class RunRepository {
     this.db = db;
   }
 
-  async listRuns(range: DateRange, limit = 50, offset = 0) {
-    validateRange(range);
-    const endExclusive = range.end === '9999-12-31' ? null : addDays(range.end, 1);
-    let itemsQuery = this.db
-      .selectFrom('runs')
-      .select(runColumns)
-      .where('start_time', '>=', range.start);
+  async listRuns(range?: DateRange, limit = 50, offset = 0) {
+    if (range) validateRange(range);
+    const endExclusive = !range || range.end === '9999-12-31' ? null : addDays(range.end, 1);
+    let itemsQuery = this.db.selectFrom('runs').select(runColumns);
+    if (range) itemsQuery = itemsQuery.where('start_time', '>=', range.start);
     if (endExclusive) itemsQuery = itemsQuery.where('start_time', '<', endExclusive);
     const items = await itemsQuery
       .orderBy('start_time', 'desc')
@@ -63,8 +59,8 @@ export class RunRepository {
       .execute();
     let countQuery = this.db
       .selectFrom('runs')
-      .select((eb) => eb.fn.countAll<number>().as('count'))
-      .where('start_time', '>=', range.start);
+      .select((eb) => eb.fn.countAll<number>().as('count'));
+    if (range) countQuery = countQuery.where('start_time', '>=', range.start);
     if (endExclusive) countQuery = countQuery.where('start_time', '<', endExclusive);
     const count = await countQuery.executeTakeFirstOrThrow();
     return { items, total: Number(count.count), limit, offset };

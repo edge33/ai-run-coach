@@ -1,107 +1,98 @@
-import { useQueryClient } from '@tanstack/react-query';
-import { lazy, Suspense } from 'react';
-import { Link, NavLink, Route, Routes } from 'react-router-dom';
+import {
+  addDays,
+  type DateRange,
+  DEFAULT_SYNC_DAYS,
+  localToday,
+  MAX_SYNC_DAYS,
+  validateRange,
+} from '@hub/contracts';
+import { useState } from 'react';
 import { useStatus, useSync } from './api.ts';
 import { ErrorNotice } from './components.tsx';
-import { Overview } from './Overview.tsx';
-import { RunDetails } from './RunDetails.tsx';
+import { Health } from './Health.tsx';
 import { Runs } from './Runs.tsx';
-import { Synchronization } from './Synchronization.tsx';
 
-const Health = lazy(() => import('./Health.tsx'));
 export function App() {
   const status = useStatus();
-  const client = useQueryClient();
   const sync = useSync();
+  const today = status.data?.today ?? localToday('Europe/Rome');
+  const [selectedRange, setSelectedRange] = useState<DateRange | null>(null);
+  const range = selectedRange ?? { start: addDays(today, 1 - DEFAULT_SYNC_DAYS), end: today };
+  let rangeError: string | null = null;
+  try {
+    validateRange(range, MAX_SYNC_DAYS);
+    if (range.end > today) rangeError = 'Choose dates up to today.';
+  } catch {
+    rangeError = `Choose a valid start and end date covering 1–${MAX_SYNC_DAYS} days.`;
+  }
+  const busy = sync.pending || !!status.data?.active;
 
   return (
-    <div className="shell">
-      <aside className="sidebar">
-        <Link to="/" className="brand">
-          <span className="brand-icon" aria-hidden="true">
-            ↗
-          </span>
-          stride<span className="brand-dot">.</span>
-        </Link>
-        <p className="eyebrow">YOUR RUNNING NOTEBOOK</p>
-        <nav aria-label="Main navigation">
-          {[
-            ['/', 'Overview', '◉'],
-            ['/runs', 'Runs', '↗'],
-            ['/health', 'Health', '♡'],
-            ['/sync', 'Synchronization', '↻'],
-          ].map(([to, name, icon]) => (
-            <NavLink key={to} to={to} end={to === '/'}>
-              <span aria-hidden="true">{icon}</span>
-              {name}
-            </NavLink>
-          ))}
-        </nav>
-        <div className="sidebar-bottom">
-          <span className="status-dot" />
-          Personal data, at your pace
-          <p>
-            Manual imports. Your records.
-            <br />A clearer view of every run.
-          </p>
-        </div>
-      </aside>
-      <div className="workspace">
-        <header className="topbar">
-          <span>RUNNING DATA HUB</span>
-          <div>
-            <span className="status-dot" />
-            {status.data?.timezone ?? 'Local workspace'}
-            <button
-              type="button"
-              className="text-button"
-              aria-label="Sync recent data"
-              disabled={sync.pending || !!status.data?.active}
-              onClick={() => sync.mutate({ mode: 'recent' })}
-            >
-              <span aria-hidden="true">↻</span> {sync.pending ? 'Syncing…' : 'Sync'}
-            </button>
-            <button
-              type="button"
-              className="text-button"
-              onClick={() => {
-                void client.invalidateQueries();
-              }}
-            >
-              Refresh view
-            </button>
-          </div>
-        </header>
-        <main>
-          <ErrorNotice error={status.error} />
-          <ErrorNotice error={sync.error} />
-          {sync.pending ? <p role="status">Syncing with Intervals.icu. Please wait…</p> : null}
-          {sync.data && !sync.pending ? (
-            <p role="status">
-              Sync {sync.data.status}: {sync.data.upserted} records saved, {sync.data.rejected}{' '}
-              unavailable.
-            </p>
-          ) : null}
-          <Suspense fallback={<p role="status">Loading view…</p>}>
-            <Routes>
-              <Route path="/" element={<Overview />} />
-              <Route path="/runs" element={<Runs />} />
-              <Route path="/runs/:id" element={<RunDetails />} />
-              <Route path="/health" element={<Health />} />
-              <Route path="/sync" element={<Synchronization />} />
-              <Route
-                path="*"
-                element={
-                  <p>
-                    Page not found. <Link to="/">Return to overview</Link>
-                  </p>
-                }
-              />
-            </Routes>
-          </Suspense>
-        </main>
-        <footer>Built around what you recorded. Nothing assumed.</footer>
-      </div>
-    </div>
+    <main>
+      <header>
+        <h1>Running data</h1>
+      </header>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!rangeError && !busy && !status.isPending && !status.isError) {
+            sync.mutate({ mode: 'range', ...range });
+          }
+        }}
+      >
+        <fieldset disabled={busy}>
+          <legend>Sync dates</legend>
+          <label>
+            Start date
+            <input
+              type="date"
+              required
+              value={range.start}
+              max={range.end || today}
+              onChange={(event) => setSelectedRange({ ...range, start: event.target.value })}
+            />
+          </label>
+          <label>
+            End date
+            <input
+              type="date"
+              required
+              value={range.end}
+              min={range.start}
+              max={today}
+              onChange={(event) => setSelectedRange({ ...range, end: event.target.value })}
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={busy || status.isPending || status.isError || !!rangeError}
+          >
+            {busy ? 'Syncing…' : 'Sync'}
+          </button>
+        </fieldset>
+      </form>
+      <p>
+        Import runs and health from Intervals.icu. Maximum 3 months (90 days), including both dates.
+      </p>
+      {rangeError ? <p role="alert">{rangeError}</p> : null}
+      <ErrorNotice error={status.error} />
+      <ErrorNotice error={sync.error} />
+      {busy ? <p role="status">Syncing with Intervals.icu. Please wait…</p> : null}
+      {sync.data && !sync.pending ? (
+        <p role="status">
+          Sync {sync.data.status}: {sync.data.upserted} records saved, {sync.data.rejected}{' '}
+          unavailable.
+        </p>
+      ) : null}
+      {status.data?.latest ? (
+        <p>
+          Latest sync: {status.data.latest.started_at.replace('T', ' ')} ·{' '}
+          {status.data.latest.status}
+        </p>
+      ) : null}
+      <p>All stored records, newest first. Up to 50 entries per page. — means not recorded.</p>
+      <Runs />
+      <Health />
+    </main>
   );
 }
