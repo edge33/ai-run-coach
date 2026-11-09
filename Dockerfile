@@ -1,18 +1,22 @@
-FROM node:24.21.0-bookworm-slim AS dependencies
+FROM node:26.13.0-bookworm-slim AS base
+COPY --from=ghcr.io/pnpm/pnpm:12.18.0 /opt/pnpm /opt/pnpm
+RUN ln -s /opt/pnpm/pnpm /usr/local/bin/pnpm
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
-COPY package.json package-lock.json turbo.json biome.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json biome.json ./
 COPY packages ./packages
 COPY apps ./apps
-RUN npm ci
+
+FROM base AS dependencies
+RUN pnpm install --frozen-lockfile
 
 FROM dependencies AS web-build
-RUN npm run build --workspace @hub/web
+RUN pnpm --filter @hub/web build
 
-FROM dependencies AS production-dependencies
-RUN npm prune --omit=dev
+FROM base AS production-dependencies
+RUN pnpm install --prod --frozen-lockfile
 
-FROM node:24.21.0-bookworm-slim AS runtime
+FROM node:26.13.0-bookworm-slim AS runtime
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000 MCP_PORT=3001
 WORKDIR /app
 COPY --from=production-dependencies --chown=node:node /app/node_modules ./node_modules

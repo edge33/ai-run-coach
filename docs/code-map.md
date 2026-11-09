@@ -48,4 +48,4 @@ UI elements; `api.ts` contains API access and display helpers.
 Start with the relevant route or screen, then follow its Store or core call. For persistence changes,
 review transaction boundaries and the schema together. Existing tests in each workspace exercise the
 public interfaces, so internal module moves retain the same regression checks. Run the root scripts
-`npm run check`, `npm run typecheck`, `npm run lint`, `npm test`, and `npm run build` after a refactor.
+`pnpm run check`, `pnpm run typecheck`, `pnpm run lint`, `pnpm test`, and `pnpm run build` after a refactor.

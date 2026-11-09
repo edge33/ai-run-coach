@@ -1,6 +1,45 @@
 # Running Data Hub progress
 
-Last updated: 2026-09-27
+Last updated: 2026-11-09
+
+## Node 26 and pnpm migration
+
+- Follow-up work remains in `/home/edge33/.paseo/worktrees/09hw1sxp/roasted-penguin`
+  on branch `roasted-penguin`, continuing the migration from `ef3ae4d`.
+- The active Paseo shell now resolves Node 26.13.0 and pnpm 12.18.0. `.nvmrc`, the root
+  Node engine, Docker build/runtime images, and CI now select Node 26. CI installs the
+  package-manager version pinned in `package.json` before configuring the pnpm cache.
+- Updated `@types/node` to 26.6.6 and regenerated `pnpm-lock.yaml`. Turbo now tracks the
+  pnpm lockfile. Docker uses frozen pnpm installs in separate development and production
+  stages and retains workspace symlinks to TypeScript sources outside `node_modules`.
+- Updated current architecture, review, resume, and local operation instructions to pnpm;
+  earlier validation records retain the tool versions actually used.
+- Removed `scripts/compose-lifecycle.mjs` and its CI step at the user's request. Compose
+  build/start, service health checks, Nginx configuration validation, and smoke tests remain.
+- `pnpm install --no-frozen-lockfile` and `pnpm install --frozen-lockfile` pass outside the
+  sandbox; the sandbox cannot write the shared pnpm store operation lock.
+- `pnpm run check`, `pnpm run typecheck`, `pnpm run lint`, and `pnpm run build` pass on
+  Node 26.13.0. Turbo emitted shared-cache write warnings inside the sandbox.
+- `pnpm test` passes all 17 tests outside the sandbox (database 4, core 6, API 1, MCP 3,
+  web 3). The sandbox run closed the MCP stdio connection and interrupted other suites.
+- Fresh Docker development/production installs and frontend build pass without build approvals:
+  `better-sqlite3@13.0.3` ships prebuilt binaries, declares `gypfile: false`, and has no install hook.
+- `TAILSCALE_IP=127.0.0.1 APP_ORIGINS=http://127.0.0.1:8080 INTERVALS_API_KEY='' docker compose
+  -p running-data-hub-validation config --quiet` and `up --build -d --wait` pass. Docker
+  used the classic builder because Buildx is absent. All services reached healthy state.
+- Container verification confirms Node v26.13.0 and `@hub/db` resolving to
+  `file:///app/packages/db/src/index.ts`.
+- Before its removal, `node scripts/compose-lifecycle.mjs` passed after the workspace fix: SSE progress/heartbeat,
+  persistence after recreation, shared SQLite integrity, health, and port isolation.
+  `node scripts/compose-smoke.mjs` and `docker compose -p running-data-hub-validation exec
+  nginx nginx -t` pass after lifecycle recreation. An earlier smoke attempt overlapped the
+  active lifecycle fixture and failed its expected idle-sync assertion; the sequential rerun passes.
+- `TAILSCALE_IP=127.0.0.1 docker compose -p running-data-hub-validation down -v` removed
+  only the disposable validation containers, network, and synthetic database/wiki volumes.
+- `pnpm run check` and `git diff --check` pass after removing the lifecycle script and CI step.
+  Docker was not rerun for this removal; the migration validation above ran before removal.
+- Next action: review the migration diff. No remaining migration blockers were found. No push,
+  merge, production deployment, live sync, or athlete-data reset was performed.
 
 ## Minimal data model implementation
 
@@ -58,7 +97,7 @@ Last updated: 2026-09-27
 
 ## Implemented
 
-- Turborepo/npm workspace, pinned Node and dependencies, shared TypeScript config, and Biome config.
+- Turborepo/pnpm workspace, pinned Node and dependencies, shared TypeScript config, and Biome config.
 - SQLite/Kysely migrations, normalized run/interval/health storage, sync metadata, coverage, issues,
   snapshots, atomic writer leases, WAL, and repository queries.
 - Validated Intervals.icu client and manual recent/range/all ingestion with retries, transactional
@@ -121,7 +160,8 @@ Validated this readability refactor on 2026-09-23 with Node 24.21.0 and npm 11.1
 
 ## Resume commands
 
-Use Node 24.21.0 and npm 11.19.0. On a fresh checkout run `npm ci` first.
+Use Node 26.13.0 and pnpm 12.18.0. Run `nvm use` and ensure the pinned pnpm version is
+available. On a fresh checkout run `pnpm install --frozen-lockfile` first.
 Run from the repository root:
 
 ```bash
@@ -129,18 +169,17 @@ git status --short
 docker version
 docker compose version
 
-npm run check
-npm run build
-npm run typecheck
-npm run lint
-npm test
+pnpm run check
+pnpm run build
+pnpm run typecheck
+pnpm run lint
+pnpm test
 
 export TAILSCALE_IP=127.0.0.1 APP_ORIGINS=http://127.0.0.1:8080 INTERVALS_API_KEY=''
 docker compose -p running-data-hub-validation config --quiet
 docker compose -p running-data-hub-validation up --build -d --wait
 docker compose -p running-data-hub-validation exec nginx nginx -t
 SMOKE_ORIGIN=http://127.0.0.1:8080 node scripts/compose-smoke.mjs
-node scripts/compose-lifecycle.mjs
 docker compose -p running-data-hub-validation ps
 docker compose -p running-data-hub-validation logs
 docker compose -p running-data-hub-validation down -v
@@ -148,7 +187,6 @@ docker compose -p running-data-hub-validation down -v
 
 Use `127.0.0.1` only for local validation. Homelab deployment must set `TAILSCALE_IP` to the host’s
 actual Tailscale address and set `APP_ORIGINS` to the matching externally used origin.
-The lifecycle script requires fresh disposable validation volumes and seeds synthetic fixtures.
 The final `down -v` deletes only that validation project's volumes; never use it against athlete data.
 Docker daemon access must be available. In restricted agent environments, Docker and subprocess
 tests may require execution outside the sandbox.
@@ -156,16 +194,15 @@ tests may require execution outside the sandbox.
 ## Local operation
 
 Copy `.env.example` to `.env`, configure local paths/origins and optional Intervals credentials, then
-run `npm run migrate` and `npm run dev` (no build prerequisite). The web app runs on port 5173, the API on
-3000, and HTTP MCP on 3001. `npm run build` produces only the frontend assets. `npm run mcp` starts the stdio transport. On this workstation, Codex starts it through the
+run `pnpm run migrate` and `pnpm run dev` (no build prerequisite). The web app runs on port 5173, the API on
+3000, and HTTP MCP on 3001. `pnpm run build` produces only the frontend assets. `pnpm run mcp` starts the stdio transport. On this workstation, Codex starts it through the
 registered `running_data_hub` MCP server; a new Codex session is needed after registration.
 The Synchronization view or
-`npm run sync` explicitly starts an import; service startup does not.
+`pnpm run sync` explicitly starts an import; service startup does not.
 
-`npm run export -- DESTINATION` writes normalized JSON records into a new empty directory.
+`pnpm run export DESTINATION` writes normalized JSON records into a new empty directory.
 The legacy backup and restore commands have been removed. The deployment reset remains a separate,
 one-time action in the minimal-model tracker.
-The lifecycle script demonstrates that helper and verifies restoration without touching host data.
 
 ## Update discipline
 
