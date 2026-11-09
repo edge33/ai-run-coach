@@ -2,7 +2,20 @@
 
 Last updated: 2026-11-09
 
-## Remove unsupported fields (current)
+## Published UI/schema PR (current)
+
+- User explicitly authorized push and PR publication. Committed the accumulated changes as
+  `5656c16` on `clumsy-mole` and pushed to `origin/clumsy-mole` from this worktree.
+- Opened [PR #11](https://github.com/edge33/ai-run-coach/pull/11) against `main`: single-page UI,
+  date-scoped manual sync (15-day default, 90-day maximum), date-independent 50-entry lists,
+  verified activity elevation loss, and migration 002 removing the two unsupported fields.
+- All implementation checks passed as recorded below (29 tests). This publication follow-up
+  changes only documentation; `git diff --check` passes. Browser/Compose checks were not run.
+- Next action: review PR #11 and its CI. Run migrations before starting updated services when
+  deploying. No merge, production deployment, athlete database migration/reset, or live sync was
+  performed. Local credentials/configuration/data and personal MCP configuration are excluded.
+
+## Remove unsupported fields
 
 - Worktree `/home/edge33/.paseo/worktrees/09hw1sxp/clumsy-mole`, branch `clumsy-mole`,
   HEAD `baba1812ac88394701d950a5e2ce5ce9c3534297`; preserved earlier uncommitted changes.

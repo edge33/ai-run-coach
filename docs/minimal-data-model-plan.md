@@ -317,3 +317,11 @@ Do not mark a phase complete based only on code changes when its validation is s
   were not run. No athlete database was migrated.
 - User authorized publishing accumulated changes as a PR. Next action: publish/review PR and CI;
   deploy code with `pnpm run migrate` before service startup. No merge is authorized.
+
+### 2026-11-09: publish accumulated UI/schema changes
+
+- User authorized publication. Implementation commit `5656c16` was pushed on `clumsy-mole` and
+  [PR #11](https://github.com/edge33/ai-run-coach/pull/11) opened against `main`. Local gates
+  pass, including 29 tests; subsequent publication handoff changes only documentation.
+- Next action: review PR and CI, then apply migrations before updated service startup at deployment.
+  No merge, production deployment, athlete database migration/reset, or live sync was performed.
