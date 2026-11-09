@@ -1,20 +1,19 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense } from 'react';
 import { Link, NavLink, Route, Routes } from 'react-router-dom';
-import { useStatus } from './api.ts';
+import { useStatus, useSync } from './api.ts';
 import { ErrorNotice } from './components.tsx';
 import { Overview } from './Overview.tsx';
 import { RunDetails } from './RunDetails.tsx';
 import { Runs } from './Runs.tsx';
 import { Synchronization } from './Synchronization.tsx';
-import { useSyncProgress } from './useSyncProgress.ts';
 
 const Health = lazy(() => import('./Health.tsx'));
 export function App() {
   const status = useStatus();
   const client = useQueryClient();
-  const activeId = status.data?.active?.id;
-  const { streamError } = useSyncProgress(activeId);
+  const sync = useSync();
+
   return (
     <div className="shell">
       <aside className="sidebar">
@@ -56,6 +55,15 @@ export function App() {
             <button
               type="button"
               className="text-button"
+              aria-label="Sync recent data"
+              disabled={sync.pending || !!status.data?.active}
+              onClick={() => sync.mutate({ mode: 'recent' })}
+            >
+              <span aria-hidden="true">↻</span> {sync.pending ? 'Syncing…' : 'Sync'}
+            </button>
+            <button
+              type="button"
+              className="text-button"
               onClick={() => {
                 void client.invalidateQueries();
               }}
@@ -66,15 +74,12 @@ export function App() {
         </header>
         <main>
           <ErrorNotice error={status.error} />
-          {activeId ? (
-            <div className="notice">
-              Synchronization in progress. <Link to="/sync">View progress →</Link>
-            </div>
-          ) : null}
-          {streamError && activeId ? (
-            <p className="notice">
-              Progress connection interrupted. Reconnecting; synchronization continues on the
-              server.
+          <ErrorNotice error={sync.error} />
+          {sync.pending ? <p role="status">Syncing with Intervals.icu. Please wait…</p> : null}
+          {sync.data && !sync.pending ? (
+            <p role="status">
+              Sync {sync.data.status}: {sync.data.upserted} records saved, {sync.data.rejected}{' '}
+              unavailable.
             </p>
           ) : null}
           <Suspense fallback={<p role="status">Loading view…</p>}>

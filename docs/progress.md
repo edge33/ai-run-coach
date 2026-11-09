@@ -2,6 +2,79 @@
 
 Last updated: 2026-11-09
 
+## Request-bound manual sync (current)
+
+- Continued PR #10 in `/tmp/ai-run-coach-worktrees/simplify-api-sync` on
+  `refactor/simplify-api-sync`, starting at `a6579e0`. The user requested direct UI-triggered
+  imports without background execution; this supersedes the earlier implementation below.
+- `POST /api/sync-runs` now awaits `beginSync`/`executeSync` and returns `200` with the final
+  completed/partial/failed/interrupted sync record. Removed the sync manager, event emitter,
+  SSE endpoint, progress callback, and browser EventSource hook. SQLite schema is unchanged.
+- Added a labeled sync icon in the top bar using the same mutation as the synchronization
+  page. No import starts on page load. Controls stay disabled during the request; the UI shows
+  the final outcome, including partial failures, and refreshes local queries when it settles.
+- Client disconnection and API shutdown abort upstream requests and retry waits. The importer
+  finalizes interruption and releases the writer lease. A competing sync returns `409` with
+  the active sync; the response schema explicitly retains that field.
+- API tests verify the request remains pending until import finishes, concurrent requests are
+  rejected, shutdown preserves stored data, and actual HTTP disconnection cancels the import.
+  UI tests verify zero imports before a click, the icon's request payload, disabled controls,
+  partial-result feedback, and local-query refresh after completion.
+- On Node `v26.13.0` / pnpm `12.18.0`, `pnpm run check` (70 files), `pnpm run typecheck`
+  (6 tasks), `pnpm run lint` (7 tasks), `pnpm test` (22 tests: database 4, core 7, API 4,
+  MCP 3, web 4), and `pnpm run build` all pass outside the sandbox. The first focused API run
+  exposed a response schema stripping `active` from busy errors; adding the explicit `409`
+  schema fixed it, and all subsequent checks pass. `git diff --check` passes.
+- Docker/Compose and browser E2E were not rerun. Imports must finish within the deployed
+  proxy's request timeout (currently 300 seconds); a proxy disconnect interrupts the import,
+  so large historical imports may need smaller explicit date ranges.
+- Next action: review updated PR #10 and its CI. The stale-summary-coverage issue, source-field
+  verification, discarded-field coverage, deployment reset, and historical import remain pending.
+  No merge, production deployment, athlete-data access, or live sync was performed.
+
+## Earlier API simplification: background synchronization
+
+- Readability follow-up: added blank lines between declarations, route registrations, validation,
+  execution, cleanup, and test phases throughout the API and core sync/client code. Compared all
+  12 affected code files against their pre-format contents with whitespace removed: identical.
+  `pnpm run check` and `git diff --check` pass. No tests were rerun for whitespace-only edits;
+  the 20-test validation below covers the same behavior. Worktree/branch and next action are unchanged.
+
+- Worktree: `/tmp/ai-run-coach-worktrees/simplify-api-sync`; branch
+  `refactor/simplify-api-sync`, based on freshly fetched `origin/main` at `a0a8f61`.
+  Publication is authorized by the user. The current main commit contains PR #6; older PR-publishing next
+  actions below are historical.
+- The minimum persisted model remains runs, ordered run intervals, wellness rows, and sync
+  metadata. No schema changes or athlete-data reset are needed for this refactor.
+- Replaced the API child-process worker, IPC parsing, child registry, and signal/kill cleanup
+  with one in-process background task. Removed `apps/api/src/worker.ts`. Existing endpoints,
+  manual sync modes, SSE progress, history, issues, and local-only reads remain available.
+- The SQLite writer lease still excludes competing API/CLI imports. Shutdown aborts active
+  upstream requests and retry waits, awaits finalization, and records interruption. Since sync
+  now shares the API process, synchronous parsing/database work also shares its event loop;
+  existing request, response, and window bounds remain in place. Abrupt process termination
+  still relies on lease expiry and the existing recovery at the next sync.
+- Simplified busy-error handling to async/await. Added synthetic tests for HTTP-triggered
+  import/completion, concurrent-start rejection, progress delivery, cancellation, preservation
+  of stored wellness, lease release, and cancellation during rate-limit backoff.
+- Node `v26.13.0`, pnpm `12.18.0`: `pnpm install --frozen-lockfile` passed outside the sandbox
+  after the sandbox could not open pnpm's store lock. `pnpm run check` (71 files),
+  `pnpm run typecheck` (6 tasks), and `pnpm run lint` (7 tasks) passed. Turbo reported
+  sandbox shared-cache write warnings.
+- `pnpm --filter @hub/api test` passed all 3 tests after correcting the new fixtures' allowed
+  origin and explicit empty interval array. The sandbox full suite passed core/API/database
+  tests but failed the MCP stdio subprocess with `Connection closed`; `pnpm test` outside
+  the sandbox passed all 20 tests (database 4, core 7, API 3, MCP 3, web 3).
+  `pnpm run build` passed using the unchanged frontend's Turbo cache.
+- `TAILSCALE_IP=127.0.0.1 APP_ORIGINS=http://127.0.0.1:8080 INTERVALS_API_KEY='' docker compose
+  -p running-data-hub-api-simplification config --quiet` passed. Container build/start/smoke
+  checks were not rerun; the sandbox cannot access the Docker daemon. `git diff --check` passed.
+- Next action: review the API simplification PR and its CI results; identify any remaining endpoints or UI
+  features to remove before shrinking the public API. The stale-summary-coverage fix remains
+  pending separately, as do source verification, discarded-field coverage, deployment reset,
+  and historical import. This change is prepared for the requested commit, push, and PR publication;
+  no merge, live import, or athlete-data access is authorized by this publication request.
+
 ## PR #6 rebase onto current main
 
 - On 2026-11-09, rebased `feature/minimal-data-model` in

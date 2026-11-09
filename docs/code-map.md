@@ -10,9 +10,9 @@ This guide locates the implementation within those boundaries.
   delegate to repositories sharing the same Kysely connection.
 - `schema.ts` defines persisted row types; `migrations.ts` owns versioned SQL and migration execution.
 - `runs.ts` reads and writes runs and intervals together, preserving their transaction boundary.
-- `health.ts` reads observations and transactionally replaces a day's measurements.
+- `health.ts` reads and upserts daily wellness rows.
 - `leases.ts` manages the atomic writer lease.
-- `sync.ts` stores sync history, recovery state, issues, snapshots, and coverage.
+- `sync.ts` stores sync history, recovery state, issues, and coverage.
 - `ranges.ts` merges imported date ranges without accessing the database.
 
 Keep repository queries near their related writes. Callers continue to use `Store`; repositories do
@@ -24,21 +24,23 @@ not create connections or import the Store facade.
 route registration, and shutdown. Files under `routes/` register run, health, summary, and manual-sync
 endpoints. `routes/schemas.ts` contains shared HTTP schema adapters and response envelopes.
 
-`routes/sync.ts` owns progress-stream handlers. The application owns the active-stream cleanup set so
-it can close connections before shutting down the sync manager. `manager.ts` retains worker lifecycle
-management. Route modules receive dependencies explicitly and remain under the `/api` prefix.
+`routes/sync.ts` awaits the importer directly inside `POST /api/sync-runs` and returns the final
+sync record. Request disconnection and application shutdown cancel upstream requests and retry waits.
+There is no sync manager, background job, or SSE endpoint. The SQLite writer lease excludes competing
+imports, including the CLI. Route modules receive dependencies explicitly under the `/api` prefix.
 
 ## Core (`packages/core/src`)
 
-`sync.ts` coordinates the manual ingestion workflow and its lease, progress, and failure handling.
-`snapshots.ts` writes compressed source evidence atomically and records its metadata. `intervals.ts`
-handles upstream requests, while `mapping.ts` validates and normalizes source records. Other domain
-modules cover summaries, wiki operations, configuration, and backup/restore.
+`sync.ts` coordinates the manual ingestion workflow and its lease, counters, and failure handling.
+`intervals.ts` handles bounded, cancellable upstream GET requests, while `mapping.ts` validates and
+normalizes source records. Other domain modules cover summaries, wiki operations, configuration,
+and normalized export. Source payloads, snapshots, and backups are not retained.
 
 ## Web (`apps/web/src`)
 
-`App.tsx` composes navigation, status notices, and routes. `useSyncProgress.ts` manages the EventSource
-subscription and query invalidation for an active manual sync, including cleanup on unmount.
+`App.tsx` composes navigation, status notices, routes, and the manual sync icon. `api.ts` exposes
+`useSync` for the icon and synchronization page: click, await the result, refresh local queries.
+The shared mutation key disables competing sync buttons while the request is pending.
 `Runs.tsx` renders the run list; `RunDetails.tsx` renders an individual run and paginated intervals.
 Overview, health, and synchronization retain their own screen modules. `components.tsx` contains shared
 UI elements; `api.ts` contains API access and display helpers.
