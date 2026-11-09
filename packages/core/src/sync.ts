@@ -2,7 +2,9 @@ import { randomUUID } from 'node:crypto';
 import {
   addDays,
   type DateRange,
+  DEFAULT_SYNC_DAYS,
   localToday,
+  MAX_SYNC_DAYS,
   type SyncRequest,
   type SyncRun,
   validateRange,
@@ -40,12 +42,12 @@ export async function beginSync(
   const today = localToday(timezone);
   const ranges =
     request.mode === 'range'
-      ? [validateRange({ start: request.start, end: request.end })]
+      ? [validateRange({ start: request.start, end: request.end }, MAX_SYNC_DAYS)]
       : request.mode === 'all'
         ? await store.importedRanges()
-        : [{ start: addDays(today, -13), end: today }];
+        : [{ start: addDays(today, 1 - DEFAULT_SYNC_DAYS), end: today }];
 
-  if (!ranges.length) ranges.push({ start: addDays(today, -13), end: today });
+  if (!ranges.length) ranges.push({ start: addDays(today, 1 - DEFAULT_SYNC_DAYS), end: today });
 
   if (ranges.some((range) => range.end > today))
     throw new Error('Future dates cannot be synchronized');

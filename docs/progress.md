@@ -2,7 +2,187 @@
 
 Last updated: 2026-11-09
 
-## Request-bound manual sync (current)
+## Published UI/schema PR (current)
+
+- User explicitly authorized push and PR publication. Committed the accumulated changes as
+  `5656c16` on `clumsy-mole` and pushed to `origin/clumsy-mole` from this worktree.
+- Opened [PR #11](https://github.com/edge33/ai-run-coach/pull/11) against `main`: single-page UI,
+  date-scoped manual sync (15-day default, 90-day maximum), date-independent 50-entry lists,
+  verified activity elevation loss, and migration 002 removing the two unsupported fields.
+- All implementation checks passed as recorded below (29 tests). This publication follow-up
+  changes only documentation; `git diff --check` passes. Browser/Compose checks were not run.
+- Next action: review PR #11 and its CI. Run migrations before starting updated services when
+  deploying. No merge, production deployment, athlete database migration/reset, or live sync was
+  performed. Local credentials/configuration/data and personal MCP configuration are excluded.
+
+## Remove unsupported fields
+
+- Worktree `/home/edge33/.paseo/worktrees/09hw1sxp/clumsy-mole`, branch `clumsy-mole`,
+  HEAD `baba1812ac88394701d950a5e2ce5ce9c3534297`; preserved earlier uncommitted changes.
+- Removed `runs.max_power_w` and `run_intervals.elevation_loss_m` from runtime contracts,
+  mappings, repository columns, and fixtures. Retained run elevation loss and interval average/max
+  power. HTTP/MCP responses and normalized exports now omit the unsupported measurements.
+- Added `002_remove_unsupported_measurements`, registered after the unchanged `001_initial`.
+  SQLite drops only the two unsupported columns. Fresh and existing databases reach the same
+  schema; no record reset or upstream import is required. Updated services must run migrations first.
+- Synthetic upgrade test starts at 001 with populated runs/intervals/wellness/lease, applies latest
+  twice, and verifies all retained values, indexes, STRICT tables, FK validity and delete cascade.
+  Fresh migration checks confirm supported columns remain and removed columns are absent.
+- Database tests pass (5). Initial focused core tests caught a new export assertion referring to
+  `run_intervals` instead of the existing `intervals` export array; corrected the assertion. Final
+  gates now pass: `pnpm run check` (68 files), `pnpm run typecheck` (6 tasks), `pnpm run lint`
+  (7 tasks), `pnpm test` (29 tests: database 5, core 9, API 5, MCP 3, web 7), `pnpm run build`,
+  and `git diff --check` on Node 26.13.0 / pnpm 12.18.0. Full tests ran outside the sandbox for
+  API sockets/MCP subprocesses. Turbo emitted read-only shared-cache warnings inside the sandbox.
+  Browser/Compose checks were not run. No athlete database was migrated or reset, no live sync run.
+- Final review confirms `001_initial` is unchanged, only the two approved columns are removed,
+  retained fields remain in repository/API/MCP/export output, and private configuration/data are
+  excluded. The user explicitly authorized committing/pushing the accumulated changes and opening
+  a PR. Next action: publish, review PR/CI, and apply migrations when deploying updated services.
+
+## Interval power/elevation investigation
+
+- Same worktree/branch `clumsy-mole`, HEAD `baba1812`; preserved all earlier uncommitted changes.
+- Interval average/max power are already mapped from `average_watts`/`max_watts`, unlike the
+  explicitly null run-level maximum power. Interval elevation loss remains explicitly null because
+  the reviewed upstream Interval schema does not provide it.
+- Read-only SQLite and three upstream activity-detail GETs confirmed sampled interval average/max
+  watts are explicitly null, while `total_elevation_loss` is absent. Only aggregate counts and field
+  presence/type metadata were printed; no athlete measurements, credentials, identifiers, or raw
+  payloads were retained. No streams fetched, sync triggered, settings changed, or records written.
+- Strengthened synthetic regression coverage for interval power mapping and persistence, including
+  zero, null/absent, and rejection of negative values. No production mapping change is warranted
+  from these samples. `pnpm run check` (67 files), `pnpm --filter @hub/core test` (9 tests),
+  `pnpm --filter @hub/core typecheck`, and `git diff --check` passed on Node 26.13.0 / pnpm 12.18.0.
+  Full-suite/build/browser/Compose checks were not repeated for this test/documentation follow-up.
+- Changes remain uncommitted alongside the earlier UI/API/contracts/database/core/docs/lockfile
+  changes; this follow-up modifies only core tests and the two progress/tracker documents.
+- Next action: review the regression coverage; investigate upstream running power configuration/processing
+  if power analysis is desired, then manually re-sync those dates after upstream values exist.
+  Deriving missing statistics from streams would change the approved scope.
+
+## Browse all stored records
+
+- Continued in `/home/edge33/.paseo/worktrees/09hw1sxp/clumsy-mole`, branch `clumsy-mole`,
+  HEAD `baba1812ac88394701d950a5e2ce5ce9c3534297`; preserved all earlier uncommitted changes.
+- Sync dates now control only imports. Both lists always read all stored records, newest first,
+  with independent offsets and a 50-entry page size. Date edits, including invalid selections,
+  do not hide lists, change their queries, or reset pagination. Sync still defaults to 15 days,
+  enforces the 90-day maximum, and refreshes local lists when the import settles.
+- Added optional paired dates to the HTTP record-list contract; omitted dates request all records.
+  HTTP run/health pages are capped at 50. Repository reads support omitting the range without
+  arbitrary historical date cutoffs. Existing filtered reads and bounded MCP contracts remain.
+- Synthetic API regression seeds 52 records per resource including older history, checks full totals,
+  newest-first pagination without duplicates, rejects limits over 50 and unpaired dates, and verifies
+  zero upstream calls. UI tests check separate pagination and unchanged lists after sync-date edits.
+- `pnpm run typecheck` (6 tasks) and `pnpm test` (28 tests: database 4, core 9, API 5, MCP 3,
+  web 7) passed on Node 26.13.0 / pnpm 12.18.0. Full tests ran outside the sandbox for API
+  sockets/MCP subprocesses. `pnpm run check` (67 files), `pnpm run lint` (7 tasks),
+  `pnpm run build`, and `git diff --check` also passed. Turbo reported read-only shared-cache
+  warnings inside the sandbox. Browser/Compose checks were not run.
+- Reviewed the final API/repository diff, optional range validation, page bounds, and UI queries.
+  Changes remain uncommitted across UI/API/contracts/database/core, tests/docs, and router
+  dependency/lockfile cleanup. Next action: review accumulated changes. No blockers, live sync,
+  or athlete-data access for this follow-up; no push, merge, or deployment.
+
+## Power/elevation mapping investigation
+
+- Same worktree/branch `clumsy-mole`, HEAD `baba1812`; earlier uncommitted UI/date changes preserved.
+- Traced source schema, mapping, sync detail merge, contracts, and database upserts. Run maximum
+  power and elevation loss were explicitly null; average power maps only `icu_average_watts`.
+- Read the current public OpenAPI at `https://intervals.icu/api/v1/docs`: Activity includes
+  `icu_average_watts` and `total_elevation_loss`, but no maximum-power field. Interval includes
+  average/max watts but no elevation-loss field. Updated only the confirmed activity loss mapping.
+- At the user's request to investigate stored data, used read-only SQLite and upstream GETs for
+  three existing runs. Printed only aggregate non-null counts, field presence/types, and power flags;
+  no identifiers, measurements, raw payloads, or credentials were retained. Samples returned null
+  average power while advertising a watts stream/device power; power was not flagged ignored.
+  This confirms null average power is upstream in those samples, without establishing its upstream
+  processing cause. No streams were fetched, imports triggered, or athlete records modified.
+- Added synthetic mapping/persistence coverage for numeric elevation loss and average power,
+  recorded zero, missing values, and invalid negative loss. On Node 26.13.0 / pnpm 12.18.0,
+  `pnpm run check` (67 files), `pnpm run typecheck` (6 tasks),
+  `pnpm --filter @hub/core test` (9 tests), and `git diff --check` passed. Turbo emitted
+  read-only shared-cache warnings. Full-suite/build/browser/Compose gates were not repeated.
+- Developer guidance at `https://forum.intervals.icu/t/solved-run-power-not-showing/9708/2`
+  says running power analysis requires configured zones and updating activities. This is a possible
+  upstream follow-up, not a confirmed diagnosis of the user's settings; none were changed.
+- Next action: review the mapping and check upstream running power configuration/processing. Existing records need a user-triggered re-sync
+  of their dates to populate elevation loss after deploying the fix. Run maximum power remains
+  null; deriving it or average power from streams would change the approved ingestion scope.
+
+## Date selection and bounded sync
+
+- Continued in `/home/edge33/.paseo/worktrees/09hw1sxp/clumsy-mole`, branch `clumsy-mole`,
+  HEAD `baba1812ac88394701d950a5e2ce5ce9c3534297`; preserved earlier uncommitted UI changes.
+- Added labeled native start/end date inputs, defaulting to today and the preceding 14 local dates.
+  Selection controls local lists and sends `{ mode: 'range', start, end }` only after Sync is clicked.
+  Date changes reset pagination. Pending sync disables the date fields and button.
+- Defined three months as 90 inclusive local dates and labeled this explicitly. UI blocks empty,
+  invalid, reversed, future, and oversized ranges without reading/syncing those ranges. Core validates
+  explicit ranges with the same 90-day maximum before acquiring a lease or making upstream calls;
+  API returns 400 for violations. Recent sync/empty-history fallback now default to 15 dates.
+  Reconciliation of existing imported history still uses bounded windows; larger historical imports
+  should be split into explicit ranges.
+- Overlap regression confirms existing runs and wellness measurements are updated without duplicates;
+  detail failure preserves prior runs/intervals. Existing writer leases reject concurrent imports.
+- Node 26.13.0 / pnpm 12.18.0: `pnpm run check` (67 files), `pnpm run typecheck` (6 tasks),
+  `pnpm run lint` (7 tasks), `pnpm test` (27 tests: database 4, core 9, API 4, MCP 3, web 7),
+  `pnpm run build`, and `git diff --check` passed. Full tests ran outside the sandbox for API
+  sockets/MCP subprocesses. Turbo emitted read-only shared-cache warnings inside the sandbox,
+  without failing successful lint/typecheck/build checks. Browser and Compose checks were not run.
+- Reviewed accumulated changes, including range limits, overlap handling, and dependency cleanup.
+  Web/API tests, contracts/core sync/tests, UI/docs, and router dependency/lockfile changes remain
+  uncommitted. Next action: review the simplified page with date selection. No implementation
+  blockers, live sync, athlete-data access, push, merge, or deployment.
+
+## Latest 30-day sync
+
+- Continued in the same `clumsy-mole` worktree/branch at `baba1812`; preserved all uncommitted
+  single-page UI changes. Recent sync now retrieves today and the preceding 29 local dates for
+  both runs and health, matching the displayed window. The empty-history fallback uses the same
+  window; `all` still only reconciles imported ranges when history exists.
+- Updated UI copy, sync fixture dates, and architecture/tracker docs. Added a synthetic regression
+  test checking actual upstream run/health request bounds across a month boundary and DST change.
+- Validation passed on Node 26.13.0 / pnpm 12.18.0: `pnpm run check` (67 files),
+  `pnpm run typecheck` (6 tasks), `pnpm --filter @hub/core test` (8 tests),
+  `pnpm --filter @hub/web test` (6 tests), `pnpm run build`, and `git diff --check`.
+  Turbo emitted read-only shared-cache warnings; checks still passed. Full suite, separate lint,
+  browser, and Compose checks were not repeated for this follow-up.
+- Next action: review the UI and 30-day default together. Core sync/test changes, web UI/tests,
+  documentation, and router dependency/lockfile cleanup remain uncommitted on `clumsy-mole`.
+  No blockers, live sync, push, merge, or deployment.
+
+## Single-page UI
+
+- Worktree `/home/edge33/.paseo/worktrees/09hw1sxp/clumsy-mole`, branch `clumsy-mole`,
+  starting commit `baba1812ac88394701d950a5e2ce5ce9c3534297`; initial worktree was clean.
+- Replaced the dashboard with one plain page: Sync, runs, and daily health lists. Removed the
+  sidebar, routes, overview, run details, charts, summaries, sync options/history, branding, and
+  decorative styles. Removed the unused React Router dependency and updated the pnpm lockfile.
+- Lists show the last 30 local dates with bounded pagination. Runs show timestamp, known indoor
+  state, distance, moving time, and average HR. Daily health shows resting HR, HRV, sleep hours,
+  and weight, including days without runs. Missing values stay distinct from zero.
+- Sync manually imports the last 30 dates, disables the button while pending or already active,
+  shows final status (including partial failures), and refreshes local queries. Page reads never
+  start imports. Historical/range sync remains available through the CLI; API/MCP are unchanged.
+- Node `v26.13.0` / pnpm `12.18.0`: frozen install passed outside the sandbox after the shared
+  pnpm store lock was read-only inside it. Focused `pnpm --filter @hub/web test` passed 6 tests,
+  covering no import before click, pending controls, partial feedback, refreshing both lists,
+  measurements/units/missingness, error states, and pagination.
+- Full gates passed: `pnpm run check` (67 files), `pnpm run typecheck` (6 tasks), `pnpm run lint`
+  (7 tasks), `pnpm test` (24 tests: database 4, core 7, API 4, MCP 3, web 6), and `pnpm run build`.
+  The initial sandbox suite failed API socket binding with `listen EPERM` and interrupted the MCP
+  subprocess; the complete rerun outside the sandbox passed. Turbo emitted read-only shared-cache
+  warnings inside the sandbox, without affecting successful lint/typecheck/build outcomes.
+- `git diff --check` passed; reviewed the final diff, including the router-only lockfile deletions.
+  Docker/Compose, browser visual checks, and browser E2E were not run. All validation used synthetic
+  records. Changes remain uncommitted in the worktree above; no implementation blockers remain.
+- Next action: review the simplified page. Existing upstream field verification,
+  discarded-field coverage, stale-summary-coverage fix, deployment reset, and historical import
+  remain separate pending work. No live sync, athlete-data access, push, merge, or deployment.
+
+## Request-bound manual sync
 
 - Continued PR #10 in `/tmp/ai-run-coach-worktrees/simplify-api-sync` on
   `refactor/simplify-api-sync`, starting at `a6579e0`. The user requested direct UI-triggered
@@ -350,7 +530,7 @@ Copy `.env.example` to `.env`, configure local paths/origins and optional Interv
 run `pnpm run migrate` and `pnpm run dev` (no build prerequisite). The web app runs on port 5173, the API on
 3000, and HTTP MCP on 3001. `pnpm run build` produces only the frontend assets. `pnpm run mcp` starts the stdio transport. On this workstation, Codex starts it through the
 registered `running_data_hub` MCP server; a new Codex session is needed after registration.
-The Synchronization view or
+The single page’s Sync button or
 `pnpm run sync` explicitly starts an import; service startup does not.
 
 `pnpm run export DESTINATION` writes normalized JSON records into a new empty directory.

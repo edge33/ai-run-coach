@@ -8,7 +8,8 @@ This guide locates the implementation within those boundaries.
 - `index.ts` preserves the package's public exports.
 - `store.ts` owns the SQLite connection, readiness checks, and cross-table counts. Its public methods
   delegate to repositories sharing the same Kysely connection.
-- `schema.ts` defines persisted row types; `migrations.ts` owns versioned SQL and migration execution.
+- `schema.ts` defines persisted row types; `migrations.ts` registers immutable modules under
+  `migrations/`. Migration 002 removes unsupported run maximum power and interval elevation loss.
 - `runs.ts` reads and writes runs and intervals together, preserving their transaction boundary.
 - `health.ts` reads and upserts daily wellness rows.
 - `leases.ts` manages the atomic writer lease.
@@ -38,12 +39,13 @@ and normalized export. Source payloads, snapshots, and backups are not retained.
 
 ## Web (`apps/web/src`)
 
-`App.tsx` composes navigation, status notices, routes, and the manual sync icon. `api.ts` exposes
-`useSync` for the icon and synchronization page: click, await the result, refresh local queries.
-The shared mutation key disables competing sync buttons while the request is pending.
-`Runs.tsx` renders the run list; `RunDetails.tsx` renders an individual run and paginated intervals.
-Overview, health, and synchronization retain their own screen modules. `components.tsx` contains shared
-UI elements; `api.ts` contains API access and display helpers.
+`App.tsx` renders the single page, start/end dates, range-sync button, validation, and sync feedback.
+The latest 15 local dates are selected for sync by default, with a 90-day maximum. `Runs.tsx` and
+`Health.tsx` always render all stored records, newest first, with independent 50-entry pages.
+Their query keys contain only offsets; sync dates do not filter or reset the lists.
+`api.ts` provides validated local API reads and `useSync`: click, await the result, refresh local
+queries. `components.tsx` contains empty/error notices and bounded pagination. There are no
+navigation routes, charts, summary cards, or detail screens.
 
 ## Reviewing changes
 

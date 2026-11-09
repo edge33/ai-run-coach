@@ -1,4 +1,4 @@
-import { intervalSchema, pageSchema, runSchema, validateRange } from '@hub/contracts';
+import { intervalSchema, recordListQuerySchema, runSchema } from '@hub/contracts';
 import type { Store } from '@hub/db';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -9,15 +9,15 @@ export function registerRunsRoutes(routes: FastifyInstance, store: Store) {
     '/runs',
     {
       schema: {
-        querystring: jsonSchema(pageSchema),
+        querystring: jsonSchema(recordListQuerySchema),
         response: response(pageResult(runSchema)),
       },
     },
     async (request) => {
-      const query = pageSchema.parse(request.query);
-      validateRange(query);
+      const query = recordListQuerySchema.parse(request.query);
+      const range = query.start && query.end ? { start: query.start, end: query.end } : undefined;
 
-      return store.listRuns(query, query.limit, query.offset);
+      return store.listRuns(range, query.limit, query.offset);
     },
   );
 
