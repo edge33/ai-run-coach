@@ -2,6 +2,30 @@
 
 Last updated: 2026-11-09
 
+## PR #6 rebase onto current main
+
+- On 2026-11-09, rebased `feature/minimal-data-model` in
+  `/home/edge33/.paseo/worktrees/09hw1sxp/mellow-parrot` onto fetched `origin/main`
+  at `95040c1`. The earlier model implementation through `d4d57ec` is tree-identical
+  to squash commit `3acec09`; only the four follow-up commits were replayed.
+- Resolved the `docs/progress.md` conflict by retaining both the main-branch Node/pnpm
+  migration history and the PR handoff notes. Updated `AGENTS.md` validation instructions
+  to the inherited pnpm tooling. Historical commit references below describe pre-rebase state.
+- On Node 26.13.0 and pnpm 12.18.0, `pnpm install --frozen-lockfile`, `pnpm run check`
+  (72 files), `pnpm run typecheck` (6 workspaces), `pnpm run lint` (7 workspaces),
+  `pnpm test` (17 tests: database 4, core 6, API 1, MCP 3, web 3), and `pnpm run build`
+  all passed. Install and checks ran outside the sandbox after the initial sandbox install
+  failed to open the shared pnpm store lock. `git diff --check` passed.
+- Reviewed `git range-diff` against the original four commits: application and regression-test
+  changes are preserved; differences are limited to handoff context. Compose was not rerun.
+- The user explicitly approved publishing after automatic review initially blocked the push.
+  Publish with an explicit lease against verified original PR head
+  `1f2ff2316ea9a360a218b8fe97be0ad4f7f83352`.
+- Next action: verify the published PR #6 head and CI. The stale-coverage
+  finding, upstream field verification, remaining log-discard coverage, and separate reset/import
+  remain pending.
+  No merge, athlete-data access, reset, or live import was performed.
+
 ## Node 26 and pnpm migration
 
 - Follow-up work remains in `/home/edge33/.paseo/worktrees/09hw1sxp/roasted-penguin`
@@ -41,15 +65,32 @@ Last updated: 2026-11-09
 - Next action: review the migration diff. No remaining migration blockers were found. No push,
   merge, production deployment, live sync, or athlete-data reset was performed.
 
+## Agent guide handoff
+
+- Updated the existing root `AGENTS.md` on `docs/agent-handoff-guide` to reference the current
+  minimal-model branch and tracker, validation commands, and machine-to-machine handoff rules.
+- The documentation branch starts at `d4d57ec`. At the user's request, all remaining sync fix,
+  regression test, and tracker/progress changes were committed as `8683e42` on
+  `feature/minimal-data-model`; the agent-guide commit was included there as `a138460`.
+- On 2026-10-09, `npm run test -w @hub/core` passed all 6 tests and `npm run check` passed
+  on 73 files; `npm run typecheck` passed all 6 TypeScript workspaces. The stale-coverage
+  finding remains pending; no full suite or Compose rerun was made.
+- Validation: `git diff --check` passed. No application tests were run for this documentation-only
+  change. The implementation follow-up remains in the original worktree's tracker and progress log.
+
 ## Minimal data model implementation
 
 - Branch: `feature/minimal-data-model`, based on fetched `origin/main` at `9b3aeb5`.
-  Draft [PR #5](https://github.com/edge33/ai-run-coach/pull/5) remains open; no merge was performed.
+  [PR #5](https://github.com/edge33/ai-run-coach/pull/5) is merged, as verified on 2026-10-09.
+  Follow-up [PR #6](https://github.com/edge33/ai-run-coach/pull/6) contains the committed detail-failure
+  fix, regression test, agent guide, and handoff notes; CI is pending. No merge was performed by
+  this handoff session.
 - The fresh SQLite migration now uses `STRICT` domain tables. Repository writes parse the shared
   Zod contracts, and run date queries include the maximum valid date. Source IDs, wellness rows,
   ordered intervals, nullable measurements, and same-day form follow the approved tracker.
-- Manual sync retains only normalized fields, handles detail failure without deleting intervals,
-  and does not run on reads. API, MCP, web, summaries, export, Compose, and lifecycle checks use the
+- Manual sync retains only normalized fields, skips activities whose detail fetch or validation
+  fails, preserves previously imported run records and intervals, and does not run on reads.
+  API, MCP, web, summaries, export, Compose, and lifecycle checks use the
   new model. Snapshot and backup/restore functionality and configuration have been removed.
 - `npm run check`, `npm run typecheck`, `npm run lint`, `npm test` (outside the sandbox for the MCP
   stdio subprocess), and `npm run build` pass locally. Database, core, API, MCP, and web tests pass.
@@ -61,9 +102,48 @@ Last updated: 2026-11-09
 - Upstream field evidence is recorded in the tracker. The official forum model supports wellness
   keys, activity speeds, and interval `max_watts`; run maximum power and elevation loss remain null
   because a supported source key was not confirmed. A live credential-backed import has not run.
-- Next action: finish source-key verification if current official OpenAPI access becomes available,
-  then complete remaining mapping/log-discard test coverage. The one-time athlete-data reset and explicit historical import remain
-  pending; do not infer a historical range from `all` on an empty database.
+- Next action: address the stale-coverage finding in the second adversarial review below, then
+  finish source-key verification if current official OpenAPI access becomes available and complete
+  remaining mapping/log-discard test coverage. The one-time athlete-data reset and explicit
+  historical import remain pending; do not infer a historical range from `all` on an empty database.
+
+## Adversarial review of draft PR #5
+
+- Reviewed the local `feature/minimal-data-model` head against fetched `origin/main` on
+  2026-09-27. `gh pr view 5 --repo edge33/ai-run-coach --json ...` could not connect to
+  `api.github.com`, so live PR metadata and comments were not inspected.
+- A disposable in-memory SQLite sync probe completed one import with detail-only distance and
+  heart rate, then repeated it with a sparse activity list row and a 404 detail response. The
+  second sync was `partial`, but the existing run's `distance_m` and `avg_hr_bpm` changed from
+  `5000`/`150` to null. The prior runs coverage row remained. Review finding: preserve valid
+  run measurements when detail retrieval fails.
+- A second disposable in-memory probe returned a list activity dated `2026-09-20` and same-ID
+  detail dated `2026-09-21`. The range sync saved the current detail date. The user confirmed
+  that this is acceptable, so the second review finding was withdrawn; no date check was added.
+- The detail-failure path was changed to record `DETAIL_UNAVAILABLE` and skip that activity
+  without saving its list row. Existing measurements, provenance, status, and intervals remain
+  unchanged; a new activity with unavailable detail is not inserted. The window remains partial.
+  The focused core test now covers both existing and new run IDs with 404 detail responses.
+  After the final test extension, `npm run test -w @hub/core` passed all 6 tests,
+  `npm run typecheck` passed all 6 TypeScript workspaces, `npm run check` checked 73 files,
+  and `npm run lint` passed all 7 workspaces. The full suite and Compose were not rerun for
+  this focused sync change.
+- No athlete data or persistent database was touched. Source verification, remaining mapping and
+  log-discard coverage, and the separate reset/import remain pending.
+
+## Second adversarial review
+
+- Reviewed the current worktree, including the uncommitted detail-failure fix, against fetched
+  `origin/main`. A disposable in-memory SQLite probe first synchronized an empty 2026-09-20 runs
+  window successfully, then returned a newly listed run whose detail request returned 404.
+- The second sync was `partial` and correctly skipped the new run, but `summarizeRuns` returned
+  `sample_size: 0`, distance `0`, and no warnings. The old runs coverage row remained and was
+  treated as full coverage despite the newer incomplete attempt. This can present an incomplete
+  range as a confident zero. No athlete data or persistent database was used.
+- Next action: make run-summary coverage and warnings account for newer partial attempts that
+  overlap an older completed coverage row, or invalidate the affected coverage when such an
+  attempt detects an unimported run. Add a regression test for the empty-success/new-run-404
+  sequence before treating the fix as complete.
 
 ## Pre-redesign state (historical)
 
