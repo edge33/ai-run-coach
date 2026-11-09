@@ -16,7 +16,7 @@ measurements must be reported rather than inferred.
 
 ## Architecture
 
-Use a Turborepo with npm workspaces and pinned dependencies:
+Use a Turborepo with pnpm workspaces and pinned dependencies:
 
 ```text
 apps/
@@ -32,7 +32,7 @@ athlete_wiki/   Local Markdown knowledge, excluded from Git
 data/           SQLite, excluded from Git
 ```
 
-Run API, MCP, and shared-library TypeScript directly on Node 24.21.0 using erasable syntax.
+Run API, MCP, and shared-library TypeScript directly on Node 26.13.0 using erasable syntax.
 Private workspace packages export their `.ts` sources; only Vite builds the browser app. Use Biome
 across all code workspaces and keep TypeScript checking as a separate gate.
 

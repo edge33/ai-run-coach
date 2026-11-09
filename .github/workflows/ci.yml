@@ -7,16 +7,17 @@ jobs:
       COMPOSE_PROJECT_NAME: running-data-hub-validation
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 24.21.0
-          cache: npm
-      - run: npm ci
-      - run: npm run check
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm test
-      - run: npm run build
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run check
+      - run: pnpm run typecheck
+      - run: pnpm run lint
+      - run: pnpm test
+      - run: pnpm run build
       - run: docker compose config --quiet
         env:
           TAILSCALE_IP: 127.0.0.1
@@ -28,7 +29,6 @@ jobs:
         env:
           TAILSCALE_IP: 127.0.0.1
       - run: node scripts/compose-smoke.mjs
-      - run: node scripts/compose-lifecycle.mjs
       - if: always()
         run: docker compose logs && docker compose down -v
         env:

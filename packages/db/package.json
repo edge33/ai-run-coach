@@ -12,7 +12,7 @@
     "test": "node --test --test-isolation=none \"tests/*.test.ts\""
   },
   "dependencies": {
-    "@hub/contracts": "*",
+    "@hub/contracts": "workspace:*",
     "kysely": "0.29.6",
     "better-sqlite3": "13.0.3"
   },
