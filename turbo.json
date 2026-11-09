@@ -1,6 +1,6 @@
 {
   "$schema": "https://turborepo.com/schema.json",
-  "globalDependencies": ["biome.json", "packages/config/**", "package-lock.json"],
+  "globalDependencies": ["biome.json", "packages/config/**", "pnpm-lock.yaml"],
   "globalPassThroughEnv": ["SMOKE_ORIGIN"],
   "tasks": {
     "transit": {
