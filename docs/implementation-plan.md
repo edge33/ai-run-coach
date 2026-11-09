@@ -21,7 +21,7 @@ Use a Turborepo with pnpm workspaces and pinned dependencies:
 ```text
 apps/
   web/          Vite, React, React Router, TanStack Query
-  api/          Fastify HTTP API and manual sync worker
+  api/          Fastify HTTP API and manual background sync
   mcp/          Shared MCP tools over stdio and Streamable HTTP
 packages/
   contracts/    Browser-safe Zod schemas and shared types
@@ -91,7 +91,8 @@ focus/reconnect refetches. Clearly distinguish loading, empty, missing, incomple
 
 Fastify provides bounded, schema-validated endpoints for runs, run details, health observations,
 summaries, data status, sync creation/history/details, and SSE progress. Starting a sync returns `202`
-and a run ID. A competing request returns the active sync. Keep credentials server-side, redact logs,
+and a run ID. A single background task runs inside the API process and publishes SSE progress;
+shutdown cancels upstream requests and retry waits, records interruption, and releases the writer lease. A competing request returns the active sync. Keep credentials server-side, redact logs,
 validate host/origin headers, and bound bodies, ranges, pages, and responses.
 
 ## Deployment

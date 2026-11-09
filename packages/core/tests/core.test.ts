@@ -257,3 +257,20 @@ test('wiki facts preserve provenance and require confirmation for conflicts', as
     await t.close();
   }
 });
+
+test('upstream cancellation interrupts rate-limit backoff without another request', async () => {
+  const controller = new AbortController();
+  let calls = 0;
+  const client = new IntervalsClient({
+    apiKey: 'synthetic',
+    athleteId: '0',
+    signal: controller.signal,
+    fetch: async () => {
+      calls++;
+      setImmediate(() => controller.abort());
+      return new Response(null, { status: 429, headers: { 'Retry-After': '30' } });
+    },
+  });
+  await assert.rejects(client.activities('2026-09-20', '2026-09-20'), { name: 'AbortError' });
+  assert.equal(calls, 1);
+});

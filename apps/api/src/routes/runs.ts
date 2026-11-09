@@ -16,9 +16,11 @@ export function registerRunsRoutes(routes: FastifyInstance, store: Store) {
     async (request) => {
       const query = pageSchema.parse(request.query);
       validateRange(query);
+
       return store.listRuns(query, query.limit, query.offset);
     },
   );
+
   routes.get(
     '/runs/:id',
     {
@@ -44,7 +46,9 @@ export function registerRunsRoutes(routes: FastifyInstance, store: Store) {
       const { interval_offset } = z
         .object({ interval_offset: z.coerce.number().default(0) })
         .parse(request.query);
+
       const result = await store.getRun(id, interval_offset);
+
       return result ?? reply.code(404).send({ error: 'NOT_FOUND' });
     },
   );

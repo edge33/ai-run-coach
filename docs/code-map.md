@@ -10,9 +10,9 @@ This guide locates the implementation within those boundaries.
   delegate to repositories sharing the same Kysely connection.
 - `schema.ts` defines persisted row types; `migrations.ts` owns versioned SQL and migration execution.
 - `runs.ts` reads and writes runs and intervals together, preserving their transaction boundary.
-- `health.ts` reads observations and transactionally replaces a day's measurements.
+- `health.ts` reads and upserts daily wellness rows.
 - `leases.ts` manages the atomic writer lease.
-- `sync.ts` stores sync history, recovery state, issues, snapshots, and coverage.
+- `sync.ts` stores sync history, recovery state, issues, and coverage.
 - `ranges.ts` merges imported date ranges without accessing the database.
 
 Keep repository queries near their related writes. Callers continue to use `Store`; repositories do
@@ -25,15 +25,16 @@ route registration, and shutdown. Files under `routes/` register run, health, su
 endpoints. `routes/schemas.ts` contains shared HTTP schema adapters and response envelopes.
 
 `routes/sync.ts` owns progress-stream handlers. The application owns the active-stream cleanup set so
-it can close connections before shutting down the sync manager. `manager.ts` retains worker lifecycle
-management. Route modules receive dependencies explicitly and remain under the `/api` prefix.
+it can close connections before shutting down the sync manager. `manager.ts` starts one in-process background sync task and forwards its progress directly to
+streams. Shutdown aborts upstream requests and retry waits, then awaits sync finalization. The SQLite
+writer lease still excludes imports started by another process, including the CLI. Route modules receive dependencies explicitly and remain under the `/api` prefix.
 
 ## Core (`packages/core/src`)
 
 `sync.ts` coordinates the manual ingestion workflow and its lease, progress, and failure handling.
-`snapshots.ts` writes compressed source evidence atomically and records its metadata. `intervals.ts`
-handles upstream requests, while `mapping.ts` validates and normalizes source records. Other domain
-modules cover summaries, wiki operations, configuration, and backup/restore.
+`intervals.ts` handles bounded, cancellable upstream GET requests, while `mapping.ts` validates and
+normalizes source records. Other domain modules cover summaries, wiki operations, configuration,
+and normalized export. Source payloads, snapshots, and backups are not retained.
 
 ## Web (`apps/web/src`)
 

@@ -2,6 +2,49 @@
 
 Last updated: 2026-11-09
 
+## API simplification: background synchronization
+
+- Readability follow-up: added blank lines between declarations, route registrations, validation,
+  execution, cleanup, and test phases throughout the API and core sync/client code. Compared all
+  12 affected code files against their pre-format contents with whitespace removed: identical.
+  `pnpm run check` and `git diff --check` pass. No tests were rerun for whitespace-only edits;
+  the 20-test validation below covers the same behavior. Worktree/branch and next action are unchanged.
+
+- Worktree: `/tmp/ai-run-coach-worktrees/simplify-api-sync`; branch
+  `refactor/simplify-api-sync`, based on freshly fetched `origin/main` at `a0a8f61`.
+  Publication is authorized by the user. The current main commit contains PR #6; older PR-publishing next
+  actions below are historical.
+- The minimum persisted model remains runs, ordered run intervals, wellness rows, and sync
+  metadata. No schema changes or athlete-data reset are needed for this refactor.
+- Replaced the API child-process worker, IPC parsing, child registry, and signal/kill cleanup
+  with one in-process background task. Removed `apps/api/src/worker.ts`. Existing endpoints,
+  manual sync modes, SSE progress, history, issues, and local-only reads remain available.
+- The SQLite writer lease still excludes competing API/CLI imports. Shutdown aborts active
+  upstream requests and retry waits, awaits finalization, and records interruption. Since sync
+  now shares the API process, synchronous parsing/database work also shares its event loop;
+  existing request, response, and window bounds remain in place. Abrupt process termination
+  still relies on lease expiry and the existing recovery at the next sync.
+- Simplified busy-error handling to async/await. Added synthetic tests for HTTP-triggered
+  import/completion, concurrent-start rejection, progress delivery, cancellation, preservation
+  of stored wellness, lease release, and cancellation during rate-limit backoff.
+- Node `v26.13.0`, pnpm `12.18.0`: `pnpm install --frozen-lockfile` passed outside the sandbox
+  after the sandbox could not open pnpm's store lock. `pnpm run check` (71 files),
+  `pnpm run typecheck` (6 tasks), and `pnpm run lint` (7 tasks) passed. Turbo reported
+  sandbox shared-cache write warnings.
+- `pnpm --filter @hub/api test` passed all 3 tests after correcting the new fixtures' allowed
+  origin and explicit empty interval array. The sandbox full suite passed core/API/database
+  tests but failed the MCP stdio subprocess with `Connection closed`; `pnpm test` outside
+  the sandbox passed all 20 tests (database 4, core 7, API 3, MCP 3, web 3).
+  `pnpm run build` passed using the unchanged frontend's Turbo cache.
+- `TAILSCALE_IP=127.0.0.1 APP_ORIGINS=http://127.0.0.1:8080 INTERVALS_API_KEY='' docker compose
+  -p running-data-hub-api-simplification config --quiet` passed. Container build/start/smoke
+  checks were not rerun; the sandbox cannot access the Docker daemon. `git diff --check` passed.
+- Next action: review the API simplification PR and its CI results; identify any remaining endpoints or UI
+  features to remove before shrinking the public API. The stale-summary-coverage fix remains
+  pending separately, as do source verification, discarded-field coverage, deployment reset,
+  and historical import. This change is prepared for the requested commit, push, and PR publication;
+  no merge, live import, or athlete-data access is authorized by this publication request.
+
 ## PR #6 rebase onto current main
 
 - On 2026-11-09, rebased `feature/minimal-data-model` in

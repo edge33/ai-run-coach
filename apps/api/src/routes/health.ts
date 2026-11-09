@@ -15,6 +15,7 @@ export function registerHealthRoutes(routes: FastifyInstance, store: Store) {
     async (request) => {
       const query = healthQuerySchema.parse(request.query);
       validateRange(query);
+
       return store.listWellness(query, query.limit, query.offset);
     },
   );

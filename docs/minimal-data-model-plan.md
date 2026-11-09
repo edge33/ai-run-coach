@@ -179,15 +179,27 @@ the wiki or unrelated applications.
 
 | 2026-11-09 | Codex / PR #6 rebase | Rebase four follow-up commits onto `origin/main` (`95040c1`); `pnpm install --frozen-lockfile`; `pnpm run check`; `pnpm run typecheck`; `pnpm run lint`; `pnpm test`; `pnpm run build`; `git diff --check` | All gates pass on Node 26.13.0/pnpm 12.18.0, including all 17 tests. Retained migration and handoff notes; Compose not rerun. | Push explicitly approved by user; verify PR #6 head/CI, then address stale coverage; other tasks remain pending |
 
+| 2026-11-09 | Codex / API simplification | Replace API child worker with cancellable in-process sync; run check, typecheck, lint, tests, build, and Compose config | All gates pass; 20 tests pass outside sandbox; container checks not rerun. Schema unchanged. | Review API simplification; stale coverage and deployment steps remain pending |
+
 For each implementation session, append commands and outcomes, including failures and checks not run.
 Do not mark a phase complete based only on code changes when its validation is still pending.
 
 ## Current handoff
 
-- Next action: address the second adversarial review finding on stale coverage after a partial
+- Current work item: first API simplification on `refactor/simplify-api-sync` in
+  `/tmp/ai-run-coach-worktrees/simplify-api-sync`, based on fetched main `a0a8f61`.
+  Replaced the child-process sync worker with a cancellable in-process background task;
+  storage schema and HTTP contracts are unchanged. All local gates pass, including 20 tests
+  outside the sandbox; Compose configuration passes, container checks were not rerun.
+  Publication is authorized; review the PR and CI before reducing the public endpoint set.
+  See `docs/progress.md` for commands, limitations, and the complete handoff.
+- Next minimal-model correctness action (deferred during API simplification): address the second
+  adversarial review finding on stale coverage after a partial
   detail import. Then confirm current upstream keys/units with live official documentation or a
   credential-backed import before marking phase 2 complete, finish remaining mapping/log-discard
   test coverage, and separately plan the data reset and historical import.
 - Known verification gap: current upstream activity maximum-power and elevation-loss keys were not confirmed; both remain null.
 - Deployment input still needed: explicit historical import range, unless supplied by later context.
-- Code changed on `feature/minimal-data-model`; no athlete data, reset, import, or merge was performed. The branch was pushed for draft PR #5.
+- Earlier minimal-model work is included in main through PR #6 at `a0a8f61`. This API
+  simplification is prepared for the requested commit, push, and PR publication. No athlete data,
+  reset, or import was performed.

@@ -30,9 +30,11 @@ export function registerSyncRoutes(
       const query = z
         .object({ limit: z.coerce.number().default(50), offset: z.coerce.number().default(0) })
         .parse(request.query);
+
       return store.syncHistory(query.limit, query.offset);
     },
   );
+
   routes.post(
     '/sync-runs',
     {
@@ -43,27 +45,34 @@ export function registerSyncRoutes(
     },
     async (request, reply) => {
       const run = await manager.start(syncRequestSchema.parse(request.body));
+
       return reply.code(202).send(run);
     },
   );
+
   routes.get(
     '/sync-runs/:id',
     { schema: { params: jsonSchema(idParams) } },
     async (request, reply) => {
       const { id } = idParams.parse(request.params);
+
       const run = await store.syncRun(id);
+
       return run
         ? { run, issues: await store.issues(id) }
         : reply.code(404).send({ error: 'NOT_FOUND' });
     },
   );
+
   routes.get(
     '/sync-runs/:id/events',
     { schema: { params: jsonSchema(idParams) } },
     async (request, reply) => {
       const { id } = idParams.parse(request.params);
       const initial = await store.syncRun(id);
+
       if (!initial) return reply.code(404).send({ error: 'NOT_FOUND' });
+
       reply.hijack();
       reply.raw.writeHead(200, {
         'Content-Type': 'text/event-stream',
@@ -71,29 +80,38 @@ export function registerSyncRoutes(
         Connection: 'keep-alive',
         'X-Accel-Buffering': 'no',
       });
+
       let closed = false;
+
       const send = (run: SyncRun) => {
         if (closed) return;
+
         if (!reply.raw.write(`event: progress\ndata: ${JSON.stringify(run)}\n\n`)) {
           cleanup();
           return;
         }
+
         if (run.status !== 'running') cleanup();
       };
+
       const heartbeat = setInterval(() => {
         if (!closed && !reply.raw.write(': heartbeat\n\n')) cleanup();
       }, 15000);
+
       const cleanup = () => {
         if (closed) return;
+
         closed = true;
         clearInterval(heartbeat);
         manager.events.off(id, send);
         streams.delete(cleanup);
         reply.raw.end();
       };
+
       streams.add(cleanup);
       manager.events.on(id, send);
       reply.raw.on('close', cleanup);
+
       // Register first, then re-read to avoid losing a terminal event while connecting.
       send((await store.syncRun(id)) ?? initial);
     },
