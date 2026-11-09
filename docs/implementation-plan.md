@@ -21,7 +21,7 @@ Use a Turborepo with pnpm workspaces and pinned dependencies:
 ```text
 apps/
   web/          Vite, React, React Router, TanStack Query
-  api/          Fastify HTTP API and manual background sync
+  api/          Fastify HTTP API and request-bound manual sync
   mcp/          Shared MCP tools over stdio and Streamable HTTP
 packages/
   contracts/    Browser-safe Zod schemas and shared types
@@ -86,14 +86,18 @@ new evidence is required.
 ## Web application and API
 
 The Vite React app contains Overview, Runs, Health, and Synchronization views. It uses local API reads,
-explicit query refresh, and SSE only for an active manual sync. Disable polling and automatic
-focus/reconnect refetches. Clearly distinguish loading, empty, missing, incomplete, and failed states.
+explicit query refresh, and a sync icon that starts an import only when clicked. Keep the request
+open until the import finishes, disable competing sync controls while waiting, then show the outcome
+and refresh local queries. Disable polling and automatic focus/reconnect refetches. Clearly distinguish
+loading, empty, missing, incomplete, and failed states.
 
 Fastify provides bounded, schema-validated endpoints for runs, run details, health observations,
-summaries, data status, sync creation/history/details, and SSE progress. Starting a sync returns `202`
-and a run ID. A single background task runs inside the API process and publishes SSE progress;
-shutdown cancels upstream requests and retry waits, records interruption, and releases the writer lease. A competing request returns the active sync. Keep credentials server-side, redact logs,
-validate host/origin headers, and bound bodies, ranges, pages, and responses.
+summaries, data status, and manual sync/history/details. `POST /api/sync-runs` executes the import
+inside the request and returns `200` with its final sync record, including completed, partial, failed,
+or interrupted status. There are no background import tasks or progress streams. A competing request
+returns `409` with the active sync. Client disconnection or API shutdown cancels upstream requests
+and retry waits, records interruption, and releases the writer lease. Keep credentials server-side,
+redact logs, validate host/origin headers, and bound bodies, ranges, pages, and responses.
 
 ## Deployment
 
@@ -102,9 +106,8 @@ Nginx target containing the production Vite assets. Docker Compose runs one-shot
 MCP, and Nginx with named volumes for the database and wiki.
 
 Only Nginx publishes `${TAILSCALE_IP}:8080`. API and MCP stay on the internal Compose network. Nginx
-serves the SPA, proxies `/api` and `/mcp`, preserves protocol headers, and disables buffering for SSE
-and MCP streams. Deployment assumes the host already participates in Tailscale. Authentication is
-outside v1; host/origin validation and request limits remain enabled.
+serves the SPA, proxies `/api` and `/mcp`, preserves protocol headers, and disables buffering for MCP
+streams. Deployment assumes the host already participates in Tailscale. Authentication is outside v1; host/origin validation and request limits remain enabled.
 
 Provide a normalized JSON export command. The one-time fresh start deletes only this application's
 legacy database and data archives after writers stop; credentials, configuration, and wiki persist.
@@ -115,6 +118,6 @@ legacy database and data archives after writers stop; credentials, configuration
 - Repeated syncs are idempotent, edits are captured, failures preserve prior data, and reads never sync.
 - Stdio and HTTP MCP expose equivalent bounded tools without protocol contamination.
 - Compose builds and starts; migrations complete; API/MCP/Nginx health checks pass.
-- Nginx serves SPA deep links, preserves API errors, proxies MCP, and streams progress.
+- Nginx serves SPA deep links, preserves API errors, proxies MCP, and returns manual import outcomes.
 - SQLite and wiki survive application-container recreation; only Nginx publishes a port.
 - Normalized export contains only the approved records and operational metadata.

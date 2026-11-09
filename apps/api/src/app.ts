@@ -3,14 +3,13 @@ import { type Config, dataStatus, isAllowedRequest, logger, SyncBusyError } from
 import type { Store } from '@hub/db';
 import Fastify, { LogController } from 'fastify';
 import { z } from 'zod';
-import { SyncManager } from './manager.ts';
 import { registerHealthRoutes } from './routes/health.ts';
 import { registerRunsRoutes } from './routes/runs.ts';
 import { response } from './routes/schemas.ts';
 import { registerSummariesRoutes } from './routes/summaries.ts';
 import { registerSyncRoutes } from './routes/sync.ts';
 
-export function buildApp(store: Store, config: Config, manager = new SyncManager(store, config)) {
+export function buildApp(store: Store, config: Config) {
   const app = Fastify({
     loggerInstance: logger,
     logController: new LogController({ disableRequestLogging: true }),
@@ -18,7 +17,7 @@ export function buildApp(store: Store, config: Config, manager = new SyncManager
     ajv: { customOptions: { removeAdditional: false } },
   });
 
-  const streams = new Set<() => void>();
+  const shutdown = new AbortController();
 
   app.addHook('onRequest', async (request, reply) => {
     if (request.url === '/healthz') return;
@@ -42,7 +41,7 @@ export function buildApp(store: Store, config: Config, manager = new SyncManager
 
     const requestError = error as Error & { validation?: unknown; statusCode?: number };
 
-    if (['CREDENTIALS_NOT_CONFIGURED', 'API_CLOSING'].includes(requestError.message))
+    if (requestError.message === 'CREDENTIALS_NOT_CONFIGURED')
       return reply.code(503).send({ error: requestError.message });
 
     if (
@@ -76,17 +75,13 @@ export function buildApp(store: Store, config: Config, manager = new SyncManager
       registerRunsRoutes(routes, store);
       registerHealthRoutes(routes, store);
       registerSummariesRoutes(routes, store);
-      registerSyncRoutes(routes, store, manager, streams);
+      registerSyncRoutes(routes, store, config, shutdown.signal);
     },
     { prefix: '/api' },
   );
 
   app.addHook('preClose', async () => {
-    for (const close of streams) close();
-  });
-
-  app.addHook('onClose', async () => {
-    await manager.close();
+    shutdown.abort();
   });
 
   return app;

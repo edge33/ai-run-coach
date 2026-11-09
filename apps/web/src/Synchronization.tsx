@@ -1,25 +1,22 @@
-import { addDays, localToday, type SyncRequest, syncRunSchema } from '@hub/contracts';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { addDays, localToday, syncRunSchema } from '@hub/contracts';
+import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { z } from 'zod';
-import { api, useStatus } from './api.ts';
+import { api, useStatus, useSync } from './api.ts';
 import { DateFilter, Empty, ErrorNotice } from './components.tsx';
 
 export function Synchronization() {
   const status = useStatus();
   const today = status.data?.today ?? localToday('Europe/Rome');
-  const client = useQueryClient();
+  const sync = useSync();
   const [range, setRange] = useState({ start: addDays(today, -13), end: today });
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
   const history = useQuery({
     queryKey: ['sync-history'],
     queryFn: () => api('/sync-runs', z.array(syncRunSchema)),
   });
-  const progress = useQuery({
-    queryKey: ['active-sync'],
-    queryFn: async () => status.data?.active ?? null,
-    enabled: false,
-  });
+
   const details = useQuery({
     queryKey: ['sync-details', selectedId],
     enabled: !!selectedId,
@@ -39,24 +36,8 @@ export function Synchronization() {
         }),
       ),
   });
-  const mutation = useMutation({
-    mutationFn: (request: SyncRequest) =>
-      api('/sync-runs', syncRunSchema, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(request),
-      }),
-    onSuccess: (run) => {
-      client.setQueryData(['active-sync'], run);
-      void client.invalidateQueries({ queryKey: ['status'] });
-      void client.invalidateQueries({ queryKey: ['sync-history'] });
-    },
-  });
-  const active =
-    progress.data?.status === 'running' && progress.data.id === status.data?.active?.id
-      ? progress.data
-      : status.data?.active;
-  const busy = mutation.isPending || !!status.data?.active;
+  const busy = sync.pending || !!status.data?.active;
+
   return (
     <>
       <div className="page-heading">
@@ -66,14 +47,14 @@ export function Synchronization() {
           <p>Imports happen only when you start them. Browsing never contacts Intervals.icu.</p>
         </div>
       </div>
-      <ErrorNotice error={mutation.error ?? history.error} />
+      <ErrorNotice error={sync.error ?? history.error} />
       <div className="sync-options">
         <section className="panel">
           <span className="option-number">01 / EVERYDAY</span>
           <h2>Sync recent data</h2>
           <p>Refresh runs and health from the last 14 days, including recent edits.</p>
-          <button type="button" disabled={busy} onClick={() => mutation.mutate({ mode: 'recent' })}>
-            {mutation.isPending ? 'Starting…' : 'Sync recent'}
+          <button type="button" disabled={busy} onClick={() => sync.mutate({ mode: 'recent' })}>
+            {sync.pending ? 'Syncing…' : '↻ Sync recent'}
           </button>
         </section>
         <section className="panel">
@@ -84,7 +65,7 @@ export function Synchronization() {
           <button
             type="button"
             disabled={busy || range.end > today}
-            onClick={() => mutation.mutate({ mode: 'range', ...range })}
+            onClick={() => sync.mutate({ mode: 'range', ...range })}
           >
             Sync date range
           </button>
@@ -97,27 +78,20 @@ export function Synchronization() {
             type="button"
             className="secondary"
             disabled={busy}
-            onClick={() => mutation.mutate({ mode: 'all' })}
+            onClick={() => sync.mutate({ mode: 'all' })}
           >
             Refresh all history
           </button>
         </section>
       </div>
-      {active ? (
-        <section className="panel" aria-live="polite">
-          <div className="section-heading">
-            <h2>Import in progress</h2>
-            <span className="badge">
-              {active.completed_windows} / {active.total_windows} windows
-            </span>
-          </div>
-          <progress max={Math.max(1, active.total_windows)} value={active.completed_windows} />
-          <p>
-            {active.upserted} records saved · {active.rejected} unavailable · {active.requests}{' '}
-            requests
-          </p>
-          <p className="muted">You can leave this page. The server will finish the import.</p>
-        </section>
+      {sync.pending ? (
+        <p role="status">Syncing with Intervals.icu. Keep this page open until it finishes.</p>
+      ) : null}
+      {sync.data && !sync.pending ? (
+        <p role="status">
+          Sync {sync.data.status}: {sync.data.upserted} records saved, {sync.data.rejected}{' '}
+          unavailable.
+        </p>
       ) : null}
       <section className="panel">
         <div className="section-heading">
@@ -172,7 +146,7 @@ export function Synchronization() {
                           className="text-button"
                           disabled={busy}
                           onClick={() =>
-                            mutation.mutate(
+                            sync.mutate(
                               run.mode === 'range'
                                 ? { mode: 'range', start: run.start, end: run.end }
                                 : { mode: run.mode },

@@ -24,22 +24,23 @@ not create connections or import the Store facade.
 route registration, and shutdown. Files under `routes/` register run, health, summary, and manual-sync
 endpoints. `routes/schemas.ts` contains shared HTTP schema adapters and response envelopes.
 
-`routes/sync.ts` owns progress-stream handlers. The application owns the active-stream cleanup set so
-it can close connections before shutting down the sync manager. `manager.ts` starts one in-process background sync task and forwards its progress directly to
-streams. Shutdown aborts upstream requests and retry waits, then awaits sync finalization. The SQLite
-writer lease still excludes imports started by another process, including the CLI. Route modules receive dependencies explicitly and remain under the `/api` prefix.
+`routes/sync.ts` awaits the importer directly inside `POST /api/sync-runs` and returns the final
+sync record. Request disconnection and application shutdown cancel upstream requests and retry waits.
+There is no sync manager, background job, or SSE endpoint. The SQLite writer lease excludes competing
+imports, including the CLI. Route modules receive dependencies explicitly under the `/api` prefix.
 
 ## Core (`packages/core/src`)
 
-`sync.ts` coordinates the manual ingestion workflow and its lease, progress, and failure handling.
+`sync.ts` coordinates the manual ingestion workflow and its lease, counters, and failure handling.
 `intervals.ts` handles bounded, cancellable upstream GET requests, while `mapping.ts` validates and
 normalizes source records. Other domain modules cover summaries, wiki operations, configuration,
 and normalized export. Source payloads, snapshots, and backups are not retained.
 
 ## Web (`apps/web/src`)
 
-`App.tsx` composes navigation, status notices, and routes. `useSyncProgress.ts` manages the EventSource
-subscription and query invalidation for an active manual sync, including cleanup on unmount.
+`App.tsx` composes navigation, status notices, routes, and the manual sync icon. `api.ts` exposes
+`useSync` for the icon and synchronization page: click, await the result, refresh local queries.
+The shared mutation key disables competing sync buttons while the request is pending.
 `Runs.tsx` renders the run list; `RunDetails.tsx` renders an individual run and paginated intervals.
 Overview, health, and synchronization retain their own screen modules. `components.tsx` contains shared
 UI elements; `api.ts` contains API access and display helpers.

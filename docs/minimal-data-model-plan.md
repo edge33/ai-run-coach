@@ -181,18 +181,19 @@ the wiki or unrelated applications.
 
 | 2026-11-09 | Codex / API simplification | Replace API child worker with cancellable in-process sync; run check, typecheck, lint, tests, build, and Compose config | All gates pass; 20 tests pass outside sandbox; container checks not rerun. Schema unchanged. | Review API simplification; stale coverage and deployment steps remain pending |
 
+| 2026-11-09 | Codex / request-bound sync | Remove background manager and SSE; await imports from UI click; run check, typecheck, lint, tests, and build | All pass, including 22 tests outside sandbox; HTTP disconnect cancels import. Schema unchanged. | Review updated PR #10 and CI; stale coverage remains separate |
+
 For each implementation session, append commands and outcomes, including failures and checks not run.
 Do not mark a phase complete based only on code changes when its validation is still pending.
 
 ## Current handoff
 
-- Current work item: first API simplification on `refactor/simplify-api-sync` in
-  `/tmp/ai-run-coach-worktrees/simplify-api-sync`, based on fetched main `a0a8f61`.
-  Replaced the child-process sync worker with a cancellable in-process background task;
-  storage schema and HTTP contracts are unchanged. All local gates pass, including 20 tests
-  outside the sandbox; Compose configuration passes, container checks were not rerun.
-  Publication is authorized; review the PR and CI before reducing the public endpoint set.
-  See `docs/progress.md` for commands, limitations, and the complete handoff.
+- Current work item: PR #10 API simplification on `refactor/simplify-api-sync` in
+  `/tmp/ai-run-coach-worktrees/simplify-api-sync`. The latest user instruction supersedes the
+  background-task approach: the UI icon starts a request-bound import and waits for its final
+  `200` result. Removed the manager and SSE flow; storage schema is unchanged. All local gates
+  pass, including 22 tests outside the sandbox; container checks were not rerun. Review the
+  updated PR and CI. See `docs/progress.md` for commands, request-timeout limits, and handoff.
 - Next minimal-model correctness action (deferred during API simplification): address the second
   adversarial review finding on stale coverage after a partial
   detail import. Then confirm current upstream keys/units with live official documentation or a
@@ -201,5 +202,5 @@ Do not mark a phase complete based only on code changes when its validation is s
 - Known verification gap: current upstream activity maximum-power and elevation-loss keys were not confirmed; both remain null.
 - Deployment input still needed: explicit historical import range, unless supplied by later context.
 - Earlier minimal-model work is included in main through PR #6 at `a0a8f61`. This API
-  simplification is prepared for the requested commit, push, and PR publication. No athlete data,
+  simplification is being updated in PR #10 following the request-bound sync instruction. No athlete data,
   reset, or import was performed.

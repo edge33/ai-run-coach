@@ -2,7 +2,37 @@
 
 Last updated: 2026-11-09
 
-## API simplification: background synchronization
+## Request-bound manual sync (current)
+
+- Continued PR #10 in `/tmp/ai-run-coach-worktrees/simplify-api-sync` on
+  `refactor/simplify-api-sync`, starting at `a6579e0`. The user requested direct UI-triggered
+  imports without background execution; this supersedes the earlier implementation below.
+- `POST /api/sync-runs` now awaits `beginSync`/`executeSync` and returns `200` with the final
+  completed/partial/failed/interrupted sync record. Removed the sync manager, event emitter,
+  SSE endpoint, progress callback, and browser EventSource hook. SQLite schema is unchanged.
+- Added a labeled sync icon in the top bar using the same mutation as the synchronization
+  page. No import starts on page load. Controls stay disabled during the request; the UI shows
+  the final outcome, including partial failures, and refreshes local queries when it settles.
+- Client disconnection and API shutdown abort upstream requests and retry waits. The importer
+  finalizes interruption and releases the writer lease. A competing sync returns `409` with
+  the active sync; the response schema explicitly retains that field.
+- API tests verify the request remains pending until import finishes, concurrent requests are
+  rejected, shutdown preserves stored data, and actual HTTP disconnection cancels the import.
+  UI tests verify zero imports before a click, the icon's request payload, disabled controls,
+  partial-result feedback, and local-query refresh after completion.
+- On Node `v26.13.0` / pnpm `12.18.0`, `pnpm run check` (70 files), `pnpm run typecheck`
+  (6 tasks), `pnpm run lint` (7 tasks), `pnpm test` (22 tests: database 4, core 7, API 4,
+  MCP 3, web 4), and `pnpm run build` all pass outside the sandbox. The first focused API run
+  exposed a response schema stripping `active` from busy errors; adding the explicit `409`
+  schema fixed it, and all subsequent checks pass. `git diff --check` passes.
+- Docker/Compose and browser E2E were not rerun. Imports must finish within the deployed
+  proxy's request timeout (currently 300 seconds); a proxy disconnect interrupts the import,
+  so large historical imports may need smaller explicit date ranges.
+- Next action: review updated PR #10 and its CI. The stale-summary-coverage issue, source-field
+  verification, discarded-field coverage, deployment reset, and historical import remain pending.
+  No merge, production deployment, athlete-data access, or live sync was performed.
+
+## Earlier API simplification: background synchronization
 
 - Readability follow-up: added blank lines between declarations, route registrations, validation,
   execution, cleanup, and test phases throughout the API and core sync/client code. Compared all

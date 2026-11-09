@@ -88,7 +88,7 @@ export async function executeSync(
   store: Store,
   config: Config,
   id: string,
-  options: { fetch?: typeof fetch; progress?: (run: SyncRun) => void; signal?: AbortSignal } = {},
+  options: { fetch?: typeof fetch; signal?: AbortSignal } = {},
 ) {
   const run = await store.syncRun(id);
 
@@ -109,7 +109,6 @@ export async function executeSync(
 
   const publish = async () => {
     await store.updateSync(id, run);
-    options.progress?.({ ...run });
   };
 
   const assertLease = async () => {
