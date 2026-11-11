@@ -19,16 +19,9 @@ jobs:
       - run: pnpm test
       - run: pnpm run build
       - run: docker compose config --quiet
-        env:
-          TAILSCALE_IP: 127.0.0.1
       - run: docker compose up --build -d --wait
         env:
-          TAILSCALE_IP: 127.0.0.1
           APP_ORIGINS: http://127.0.0.1:8080
       - run: docker compose exec nginx nginx -t
-        env:
-          TAILSCALE_IP: 127.0.0.1
       - if: always()
         run: docker compose logs && docker compose down -v
-        env:
-          TAILSCALE_IP: 127.0.0.1

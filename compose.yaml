@@ -10,7 +10,7 @@ x-runtime: &runtime
     SQLITE_PATH: /app/data/db/coach.sqlite
     WIKI_PATH: /app/athlete_wiki
     ATHLETE_TIMEZONE: ${ATHLETE_TIMEZONE:-Europe/Rome}
-    APP_ORIGINS: ${APP_ORIGINS:-http://${TAILSCALE_IP:?Set TAILSCALE_IP to the host Tailscale address}:8080}
+    APP_ORIGINS: ${APP_ORIGINS:-http://${BIND_IP:-127.0.0.1}:8080}
   networks: [hub]
 
 services:
@@ -61,7 +61,7 @@ services:
       target: proxy
     restart: unless-stopped
     ports:
-      - "${TAILSCALE_IP:?Set TAILSCALE_IP to the host Tailscale address}:8080:8080"
+      - "${BIND_IP:-127.0.0.1}:8080:8080"
     depends_on:
       api:
         condition: service_healthy

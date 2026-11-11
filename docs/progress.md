@@ -2,6 +2,24 @@
 
 Last updated: 2026-11-11
 
+## Generic deployment bind address (current)
+
+- Removed vendor-specific network references from Compose, CI, environment examples, and all
+  documentation, including earlier deployment records. Compose now uses `BIND_IP`, defaulting to
+  `127.0.0.1`; its default `APP_ORIGINS` follows that address. Remote deployments can configure
+  a host interface address and matching origin. CI uses the default loopback binding.
+- Renamed the ignored local `.env` key while preserving its configured value; no local configuration
+  or credentials are committed. No application logic changed.
+- Validation: `pnpm run check` (72 files) and `git diff --check` pass. Disposable
+  `docker compose --env-file /dev/null -p running-data-hub-validation config --format json`
+  inspection confirms default loopback and explicit `BIND_IP=192.0.2.10` port/origin values.
+  Case-insensitive repository search, including environment files, finds no remaining references;
+  Git metadata, dependencies, build caches, and private athlete data are excluded from that search.
+  Application tests/build and Docker startup were not repeated for this configuration/docs change.
+- Worktree `/home/edge33/dev/ai-run-coach`, branch `refactor/migration-script`, based on `7cca89c`.
+  Follow-up belongs to PR #13. Next action: review updated PR/CI; no implementation blocker,
+  deployment, live import, or database migration.
+
 ## Migration script and application-only tests (current)
 
 - Moved the deployment bootstrap to `scripts/migrate.ts` and added `pnpm run migrate` with
@@ -16,7 +34,7 @@ Last updated: 2026-11-11
   `pnpm exec turbo run test --force` outside the sandbox passes all 49 remaining tests
   (DB 5, core 26, API 7, MCP 3, web 8), uncached.
 - Earlier relocation validation: repeat migration against disposable synthetic SQLite and
-  `TAILSCALE_IP=127.0.0.1 APP_ORIGINS=http://127.0.0.1:8080 INTERVALS_API_KEY='' docker compose
+  `BIND_IP=127.0.0.1 APP_ORIGINS=http://127.0.0.1:8080 INTERVALS_API_KEY='' docker compose
   --env-file /dev/null -p running-data-hub-validation config --quiet` passed. Initial socket test
   restriction required an outside-sandbox rerun. Docker image build/startup was not rerun locally.
 - Publication authorized by user. Worktree `/home/edge33/dev/ai-run-coach`, branch
@@ -111,7 +129,7 @@ Last updated: 2026-11-11
   `pnpm run lint` passes (7 tasks), `pnpm test` passes 49 tests (DB 6, core 24, API/bootstrap 8,
   MCP 3, web 8), `pnpm run build`, and `git diff --check` pass. Full tests ran outside the sandbox
   for socket/subprocess support; Turbo emitted read-only cache warnings inside it.
-  Initial Compose config validation lacked required TAILSCALE_IP; retry with disposable synthetic
+  Initial Compose config validation lacked the then-required bind address; retry with disposable synthetic
   environment and `--env-file /dev/null` passes. No Compose startup/browser check was performed.
 - Summary proposal (not implemented): retrieve measurements and coverage in one SQLite read
   transaction for run and health summaries; test a concurrent import publication between the reads.
@@ -588,7 +606,7 @@ Last updated: 2026-11-11
   tests but failed the MCP stdio subprocess with `Connection closed`; `pnpm test` outside
   the sandbox passed all 20 tests (database 4, core 7, API 3, MCP 3, web 3).
   `pnpm run build` passed using the unchanged frontend's Turbo cache.
-- `TAILSCALE_IP=127.0.0.1 APP_ORIGINS=http://127.0.0.1:8080 INTERVALS_API_KEY='' docker compose
+- `BIND_IP=127.0.0.1 APP_ORIGINS=http://127.0.0.1:8080 INTERVALS_API_KEY='' docker compose
   -p running-data-hub-api-simplification config --quiet` passed. Container build/start/smoke
   checks were not rerun; the sandbox cannot access the Docker daemon. `git diff --check` passed.
 - Next action: review the API simplification PR and its CI results; identify any remaining endpoints or UI
@@ -643,7 +661,7 @@ Last updated: 2026-11-11
   web 3). The sandbox run closed the MCP stdio connection and interrupted other suites.
 - Fresh Docker development/production installs and frontend build pass without build approvals:
   `better-sqlite3@13.0.3` ships prebuilt binaries, declares `gypfile: false`, and has no install hook.
-- `TAILSCALE_IP=127.0.0.1 APP_ORIGINS=http://127.0.0.1:8080 INTERVALS_API_KEY='' docker compose
+- `BIND_IP=127.0.0.1 APP_ORIGINS=http://127.0.0.1:8080 INTERVALS_API_KEY='' docker compose
   -p running-data-hub-validation config --quiet` and `up --build -d --wait` pass. Docker
   used the classic builder because Buildx is absent. All services reached healthy state.
 - Container verification confirms Node v26.13.0 and `@hub/db` resolving to
@@ -653,7 +671,7 @@ Last updated: 2026-11-11
   `node scripts/compose-smoke.mjs` and `docker compose -p running-data-hub-validation exec
   nginx nginx -t` pass after lifecycle recreation. An earlier smoke attempt overlapped the
   active lifecycle fixture and failed its expected idle-sync assertion; the sequential rerun passes.
-- `TAILSCALE_IP=127.0.0.1 docker compose -p running-data-hub-validation down -v` removed
+- `BIND_IP=127.0.0.1 docker compose -p running-data-hub-validation down -v` removed
   only the disposable validation containers, network, and synthetic database/wiki volumes.
 - `pnpm run check` and `git diff --check` pass after removing the lifecycle script and CI step.
   Docker was not rerun for this removal; the migration validation above ran before removal.
@@ -809,18 +827,18 @@ Validated this readability refactor on 2026-09-23 with Node 24.21.0 and npm 11.1
 
 ## Previous main-branch Docker validation (not rerun for this refactor)
 
-- `TAILSCALE_IP=127.0.0.1 APP_ORIGINS=http://127.0.0.1:8080 INTERVALS_API_KEY='' docker compose
+- `BIND_IP=127.0.0.1 APP_ORIGINS=http://127.0.0.1:8080 INTERVALS_API_KEY='' docker compose
   -p running-data-hub-validation up --build -d --wait` passed: runtime/proxy builds, migrations,
   and all service health checks. Docker used its classic builder because Buildx is absent.
 - A Node assertion inside the API container verified that all three `@hub` libraries resolve to
   `/app/packages/<name>/src/index.ts`, import successfully, and have no `dist` directory.
-- `TAILSCALE_IP=127.0.0.1 docker compose -p running-data-hub-validation exec nginx nginx -t`
+- `BIND_IP=127.0.0.1 docker compose -p running-data-hub-validation exec nginx nginx -t`
   and `node scripts/compose-smoke.mjs` passed: SPA deep links, missing-asset/API 404s, MCP
   initialization/list/call, and rejected untrusted origins through the proxy.
 
 - `node scripts/compose-lifecycle.mjs` passed SSE progress/heartbeat streaming, persistence across
   service recreation, shared SQLite, integrity, port isolation, and coordinated backup/restore.
-- `TAILSCALE_IP=127.0.0.1 docker compose -p running-data-hub-validation down -v` removed the
+- `BIND_IP=127.0.0.1 docker compose -p running-data-hub-validation down -v` removed the
   disposable validation stack and synthetic-data volumes. No athlete data was used.
 - Previous recommendation was to review the refactor PR against `main`; the current next action
   is the minimal-model tracker above. No push or merge is authorized by this documentation task.
@@ -829,8 +847,8 @@ Validated this readability refactor on 2026-09-23 with Node 24.21.0 and npm 11.1
 
 - No live Intervals.icu credentials were supplied. Ingestion was validated with synthetic upstream
   responses; a real athlete import remains a deployment smoke check initiated by the user.
-- Tailscale exposure was validated with loopback substituted for the address. Access from another
-  tailnet device remains a deployment check after configuring the real address and matching origin.
+- Network exposure was validated on loopback. Access from another device remains a deployment
+  check after configuring the host interface address and matching origin.
 - No production deployment or merge has been performed.
 
 ## Resume commands
@@ -850,7 +868,7 @@ pnpm run typecheck
 pnpm run lint
 pnpm test
 
-export TAILSCALE_IP=127.0.0.1 APP_ORIGINS=http://127.0.0.1:8080 INTERVALS_API_KEY=''
+export BIND_IP=127.0.0.1 APP_ORIGINS=http://127.0.0.1:8080 INTERVALS_API_KEY=''
 docker compose -p running-data-hub-validation config --quiet
 docker compose -p running-data-hub-validation up --build -d --wait
 docker compose -p running-data-hub-validation exec nginx nginx -t
@@ -859,8 +877,8 @@ docker compose -p running-data-hub-validation logs
 docker compose -p running-data-hub-validation down -v
 ```
 
-Use `127.0.0.1` only for local validation. Homelab deployment must set `TAILSCALE_IP` to the host’s
-actual Tailscale address and set `APP_ORIGINS` to the matching externally used origin.
+Compose defaults to `BIND_IP=127.0.0.1` for local access. For remote access, set `BIND_IP` to
+a host interface address and `APP_ORIGINS` to the matching externally used origin.
 The final `down -v` deletes only that validation project's volumes; never use it against athlete data.
 Docker daemon access must be available. In restricted agent environments, Docker and subprocess
 tests may require execution outside the sandbox.

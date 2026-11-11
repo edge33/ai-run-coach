@@ -230,6 +230,13 @@ Do not mark a phase complete based only on code changes when its validation is s
 
 ## Current handoff
 
+- Deployment configuration now uses generic `BIND_IP` with a loopback default and matching default
+  origins. Removed vendor-specific network references throughout project files and documentation;
+  renamed the ignored local environment key without committing configuration. Check/diff checks pass;
+  Compose rendering confirms loopback and explicit interface bindings/origins. No application change;
+  tests/build/startup not repeated. Follow-up on `refactor/migration-script` for PR #13;
+  next action: review PR/CI. No blocker or deployment.
+
 - Migration bootstrap moved to `scripts/migrate.ts`, exposed through `pnpm run migrate`, with
   Docker/Compose paths updated. Automated tests now focus on application behavior: bootstrap/upgrade
   migration tests, schema/configuration assertions, and Compose smoke script/CI invocation removed;
