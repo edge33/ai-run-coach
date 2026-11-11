@@ -32,7 +32,8 @@ endpoints. `routes/schemas.ts` contains shared HTTP schema adapters and response
 sync record. Request disconnection and application shutdown cancel upstream requests and retry waits.
 There is no sync manager, background job, or SSE endpoint. The SQLite writer lease excludes competing
 imports from concurrent browser requests. Route modules receive dependencies explicitly under the
-`/api` prefix. `migrate.ts` is a dedicated deployment bootstrap; there is no general CLI.
+`/api` prefix. `scripts/migrate.ts` is a dedicated deployment bootstrap, run locally with
+`pnpm run migrate` and directly by Compose; there is no general CLI.
 Imports accept explicit dates only and fetch the full approved dataset for those dates.
 
 ## Core (`packages/core/src`)

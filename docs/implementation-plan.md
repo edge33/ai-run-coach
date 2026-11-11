@@ -142,9 +142,11 @@ Build one multi-stage Dockerfile with a non-root Node runtime target for API/MCP
 Nginx target containing the production Vite assets. Docker Compose runs one-shot migrations, API,
 MCP, and Nginx with named volumes for the database and wiki.
 
-Only Nginx publishes `${TAILSCALE_IP}:8080`. API and MCP stay on the internal Compose network. Nginx
+Only Nginx publishes `${BIND_IP:-127.0.0.1}:8080`. API and MCP stay on the internal Compose network. Nginx
 serves the SPA, proxies `/api` and `/mcp`, preserves protocol headers, and disables buffering for MCP
-streams. Deployment assumes the host already participates in Tailscale. Authentication is outside v1; host/origin validation and request limits remain enabled.
+streams. Set `BIND_IP` to a host interface address for remote access and `APP_ORIGINS` to the
+externally used origin. Authentication is outside v1; host/origin validation and request limits
+remain enabled.
 
 Retain normalized JSON export through the core library function. The general CLI is removed;
 Compose invokes a dedicated migration bootstrap. The one-time fresh start deletes only this application's

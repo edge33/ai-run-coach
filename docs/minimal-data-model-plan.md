@@ -230,6 +230,23 @@ Do not mark a phase complete based only on code changes when its validation is s
 
 ## Current handoff
 
+- Deployment configuration now uses generic `BIND_IP` with a loopback default and matching default
+  origins. Removed vendor-specific network references throughout project files and documentation;
+  renamed the ignored local environment key without committing configuration. Check/diff checks pass;
+  Compose rendering confirms loopback and explicit interface bindings/origins. No application change;
+  tests/build/startup not repeated. Follow-up on `refactor/migration-script` for PR #13;
+  next action: review PR/CI. No blocker or deployment.
+
+- Migration bootstrap moved to `scripts/migrate.ts`, exposed through `pnpm run migrate`, with
+  Docker/Compose paths updated. Automated tests now focus on application behavior: bootstrap/upgrade
+  migration tests, schema/configuration assertions, and Compose smoke script/CI invocation removed;
+  application assertions retained. Final check/typecheck/lint/build/diff pass, and all 49 remaining
+  tests pass uncached outside the sandbox. Earlier synthetic migration/Compose config passed;
+  local image build/startup not repeated. User authorized publication on `refactor/migration-script`
+  based on `main` at `0ef6bc4`: implementation commit `dcdb5d9` pushed and
+  [PR #13](https://github.com/edge33/ai-run-coach/pull/13) opened against `main`.
+  Next action: review PR/CI. No athlete data access, deployment, or merge. See progress.md for commands.
+
 - Published [PR #12](https://github.com/edge33/ai-run-coach/pull/12) from `money-hedgehog` to `main`;
   implementation commit `74fa65e`. Next action: review PR/CI and complete source/Compose/browser
   verification before deployment. No merge or live import performed.
