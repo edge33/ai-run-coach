@@ -2,6 +2,19 @@
 
 Last updated: 2026-11-11
 
+## Published PR #12 (current)
+
+- User authorized pushing and opening a PR. Committed the reviewed accumulated implementation,
+  tests, and docs as `74fa65e` on `money-hedgehog`, pushed to origin, and opened
+  [PR #12](https://github.com/edge33/ai-run-coach/pull/12) against `main`.
+- The implementation commit contains only reviewed source/tests/docs/configuration; no athlete
+  data, credentials, databases, raw snapshots, or local personal configuration. Local validation
+  remains the previously recorded passing full gates, 51 synthetic tests, independent review, and
+  synthetic Compose config; publishing does not constitute deployment or historical import.
+- Next action: review PR #12 and hosted CI, then complete outstanding source/Compose/browser
+  verification before deployment. No merge, deployment, or live import was performed. This docs
+  publication record is committed separately after PR creation.
+
 ## Independent verification review (current)
 
 - User requested another sub-agent code review and verification of earlier findings. Reviewer

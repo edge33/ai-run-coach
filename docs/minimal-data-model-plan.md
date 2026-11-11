@@ -223,10 +223,17 @@ the wiki or unrelated applications.
 
 | 2026-11-11 | Codex / independent verification review | Sub-agent review of tracked/untracked changes; core/DB/web/API/MCP tests; synthetic Compose config; diff check | All 51 tests pass. Summary/expired-active fixes verified; history-derived import path removed. No new confirmed implementation defect. Corrected stale operational CLI docs; all-null parser issue excluded by user. | Review/commit accumulated work and finish source/Compose/CI checks before deployment. |
 
+| 2026-11-11 | Codex / PR publication | Commit reviewed changes as 74fa65e; push money-hedgehog; create PR #12 against main | Push and PR creation succeeded. Prior full gates and 51-test review validation stand; no merge/deployment/live import. | Review PR #12 and CI; complete outstanding source/Compose/browser verification before deployment. |
+
 For each implementation session, append commands and outcomes, including failures and checks not run.
 Do not mark a phase complete based only on code changes when its validation is still pending.
 
 ## Current handoff
+
+- Published [PR #12](https://github.com/edge33/ai-run-coach/pull/12) from `money-hedgehog` to `main`;
+  implementation commit `74fa65e`. Next action: review PR/CI and complete source/Compose/browser
+  verification before deployment. No merge or live import performed.
+
 
 - Independent follow-up review confirms summary consistency and expired-active recovery fixes,
   plus removal of history-derived import paths. All 51 tests independently pass; no new confirmed
