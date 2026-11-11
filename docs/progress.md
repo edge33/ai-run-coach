@@ -21,8 +21,10 @@ Last updated: 2026-11-11
   restriction required an outside-sandbox rerun. Docker image build/startup was not rerun locally.
 - Publication authorized by user. Worktree `/home/edge33/dev/ai-run-coach`, branch
   `refactor/migration-script`, based on `main` at `0ef6bc4` (matching fetched `origin/main`).
-  No athlete database migration, live import, deployment, or merge. Next action: publish PR and
-  review hosted CI; no local implementation blocker.
+  Published implementation commit `dcdb5d9` and opened
+  [PR #13](https://github.com/edge33/ai-run-coach/pull/13) against `main`.
+  No athlete database migration, live import, deployment, or merge. Next action: review PR/hosted CI;
+  no local implementation blocker. Publication notes are committed separately.
 
 ## Published PR #12 (current)
 

@@ -236,8 +236,9 @@ Do not mark a phase complete based only on code changes when its validation is s
   application assertions retained. Final check/typecheck/lint/build/diff pass, and all 49 remaining
   tests pass uncached outside the sandbox. Earlier synthetic migration/Compose config passed;
   local image build/startup not repeated. User authorized publication on `refactor/migration-script`
-  based on `main` at `0ef6bc4`; next action: publish PR and review CI. No athlete data access,
-  deployment, or merge. See progress.md for exact commands.
+  based on `main` at `0ef6bc4`: implementation commit `dcdb5d9` pushed and
+  [PR #13](https://github.com/edge33/ai-run-coach/pull/13) opened against `main`.
+  Next action: review PR/CI. No athlete data access, deployment, or merge. See progress.md for commands.
 
 - Published [PR #12](https://github.com/edge33/ai-run-coach/pull/12) from `money-hedgehog` to `main`;
   implementation commit `74fa65e`. Next action: review PR/CI and complete source/Compose/browser
