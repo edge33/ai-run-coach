@@ -28,7 +28,6 @@ jobs:
       - run: docker compose exec nginx nginx -t
         env:
           TAILSCALE_IP: 127.0.0.1
-      - run: node scripts/compose-smoke.mjs
       - if: always()
         run: docker compose logs && docker compose down -v
         env:

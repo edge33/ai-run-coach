@@ -20,7 +20,8 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "mcp": "node --env-file-if-exists=.env apps/mcp/src/stdio.ts"
+    "mcp": "node --env-file-if-exists=.env apps/mcp/src/stdio.ts",
+    "migrate": "node --env-file-if-exists=.env scripts/migrate.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",

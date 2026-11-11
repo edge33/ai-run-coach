@@ -17,7 +17,7 @@ services:
   migrate:
     <<: *runtime
     restart: "no"
-    command: [node, apps/api/src/migrate.ts]
+    command: [node, scripts/migrate.ts]
     volumes:
       - database:/app/data/db
 

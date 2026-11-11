@@ -2,6 +2,28 @@
 
 Last updated: 2026-11-11
 
+## Migration script and application-only tests (current)
+
+- Moved the deployment bootstrap to `scripts/migrate.ts` and added `pnpm run migrate` with
+  optional root `.env` loading. Docker copies the script; Compose invokes its new path.
+  Updated local-operation documentation. Database migration definitions and staging remain unchanged.
+- Added `AGENTS.md` guidance limiting automated tests to application behavior. Removed the bootstrap
+  and upgrade migration tests, migration/schema/configuration assertions from the mixed DB test,
+  and the Compose smoke script/CI invocation. Retained upsert, interval preservation, wellness,
+  invalid-date, transaction, pagination, and concurrency checks. Other Compose CI steps remain.
+- Final validation on Node 26.13.0/pnpm 12.18.0: `pnpm run check` (72 files),
+  `pnpm run typecheck`, `pnpm run lint`, `pnpm run build`, and `git diff --check` pass.
+  `pnpm exec turbo run test --force` outside the sandbox passes all 49 remaining tests
+  (DB 5, core 26, API 7, MCP 3, web 8), uncached.
+- Earlier relocation validation: repeat migration against disposable synthetic SQLite and
+  `TAILSCALE_IP=127.0.0.1 APP_ORIGINS=http://127.0.0.1:8080 INTERVALS_API_KEY='' docker compose
+  --env-file /dev/null -p running-data-hub-validation config --quiet` passed. Initial socket test
+  restriction required an outside-sandbox rerun. Docker image build/startup was not rerun locally.
+- Publication authorized by user. Worktree `/home/edge33/dev/ai-run-coach`, branch
+  `refactor/migration-script`, based on `main` at `0ef6bc4` (matching fetched `origin/main`).
+  No athlete database migration, live import, deployment, or merge. Next action: publish PR and
+  review hosted CI; no local implementation blocker.
+
 ## Published PR #12 (current)
 
 - User authorized pushing and opening a PR. Committed the reviewed accumulated implementation,
@@ -830,7 +852,6 @@ export TAILSCALE_IP=127.0.0.1 APP_ORIGINS=http://127.0.0.1:8080 INTERVALS_API_KE
 docker compose -p running-data-hub-validation config --quiet
 docker compose -p running-data-hub-validation up --build -d --wait
 docker compose -p running-data-hub-validation exec nginx nginx -t
-SMOKE_ORIGIN=http://127.0.0.1:8080 node scripts/compose-smoke.mjs
 docker compose -p running-data-hub-validation ps
 docker compose -p running-data-hub-validation logs
 docker compose -p running-data-hub-validation down -v
@@ -845,7 +866,7 @@ tests may require execution outside the sandbox.
 ## Local operation
 
 Copy `.env.example` to `.env`, configure local paths/origins and optional Intervals credentials, then
-run the deployment bootstrap with `node --env-file-if-exists=.env apps/api/src/migrate.ts`, then
+run the deployment bootstrap with `pnpm run migrate`, then
 `pnpm run dev` (no build prerequisite). The web app runs on port 5173, the API on
 3000, and HTTP MCP on 3001. `pnpm run build` produces only the frontend assets. `pnpm run mcp` starts the stdio transport. On this workstation, Codex starts it through the
 registered `running_data_hub` MCP server; a new Codex session is needed after registration.

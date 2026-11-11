@@ -24,6 +24,7 @@ COPY --from=production-dependencies --chown=node:node /app/packages ./packages
 COPY --from=production-dependencies --chown=node:node /app/apps/api ./apps/api
 COPY --from=production-dependencies --chown=node:node /app/apps/mcp ./apps/mcp
 COPY --from=production-dependencies --chown=node:node /app/package.json ./package.json
+COPY --chown=node:node scripts/migrate.ts ./scripts/migrate.ts
 RUN mkdir -p /app/data/db /app/athlete_wiki && chown -R node:node /app/data /app/athlete_wiki
 USER node
 EXPOSE 3000 3001

@@ -28,6 +28,8 @@ resume without conversation history.
 
 ## Validation and handoff
 
+- Write automated tests only for application logic and observable application behavior. Do not add
+  tests for migrations, maintenance scripts, deployment wiring, or tooling/configuration.
 - Use the Node and pnpm versions pinned in the repository. On a fresh checkout, run `pnpm install --frozen-lockfile`.
 - Run checks appropriate to the change. The full gates are `pnpm run check`, `pnpm run typecheck`,
   `pnpm run lint`, `pnpm test`, and `pnpm run build`; Compose validation commands are in
