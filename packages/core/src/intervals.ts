@@ -1,4 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises';
+import { runStreamTypes } from './streams.ts';
 
 export class UpstreamError extends Error {
   code: string;
@@ -15,6 +16,7 @@ export interface ClientOptions {
   fetch?: typeof fetch;
   timeoutMs?: number;
   signal?: AbortSignal;
+  retry?: boolean;
   sleep?: (ms: number) => Promise<void>;
   onRequest?: () => Promise<void>;
   onRateLimit?: (remaining: string | null, limit: string | null) => void;
@@ -34,7 +36,8 @@ export class IntervalsClient {
     const signal = this.options.signal ? AbortSignal.any([this.options.signal, timeout]) : timeout;
     const deadline = Date.now() + (this.options.timeoutMs ?? 60000);
 
-    for (let attempt = 0; attempt < 4; attempt++) {
+    const attempts = this.options.retry === false ? 1 : 4;
+    for (let attempt = 0; attempt < attempts; attempt++) {
       signal.throwIfAborted();
       await this.options.onRequest?.();
       let response: Response;
@@ -52,7 +55,7 @@ export class IntervalsClient {
       } catch {
         if (signal.aborted) throw new UpstreamError('REQUEST_TIMEOUT');
 
-        if (attempt === 3) throw new UpstreamError('NETWORK_ERROR');
+        if (attempt === attempts - 1) throw new UpstreamError('NETWORK_ERROR');
 
         await (this.options.sleep ?? delay)(Math.min(2000, 250 * 2 ** attempt), undefined, {
           signal,
@@ -68,7 +71,7 @@ export class IntervalsClient {
       if (response.status === 429 || response.status >= 500) {
         await response.body?.cancel();
 
-        if (attempt === 3) throw new UpstreamError(`HTTP_${response.status}`);
+        if (attempt === attempts - 1) throw new UpstreamError(`HTTP_${response.status}`);
 
         const retryAfter = response.headers.get('retry-after');
         const seconds = retryAfter === null ? Number.NaN : Number(retryAfter);
@@ -139,5 +142,14 @@ export class IntervalsClient {
 
   activity(id: string) {
     return this.get(`/activity/${encodeURIComponent(id)}?intervals=true`);
+  }
+
+  streams(id: string) {
+    return this.get(
+      `/activity/${encodeURIComponent(id)}/streams.json?${new URLSearchParams({
+        types: runStreamTypes.join(','),
+        includeDefaults: 'false',
+      })}`,
+    );
   }
 }

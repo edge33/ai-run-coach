@@ -4,6 +4,9 @@
 > original data model, snapshot, backup/restore, and migration requirements below. The code now
 > uses that model; operational reset and historical import remain separate deployment steps.
 
+The approved [run analysis extension](run-analysis-data.md) adds normalized sample streams and exact
+interval boundaries. It supersedes the earlier summary-only ingestion scope.
+
 ## Purpose
 
 Build a personal running-data hub that manually imports completed runs and health data from
@@ -46,29 +49,37 @@ Persist:
 
 - completed road, trail, treadmill, and virtual running activities;
 - source-provided intervals in upstream order;
+- aligned time, distance, speed, HR, power, altitude, and cadence samples, with distinct raw/corrected
+  streams and exact interval boundaries;
 - daily wellness rows with the approved measurements and units;
 - minimal sync runs, issues, coverage, and writer leases.
 
 Do not persist unsupported run maximum power or interval elevation loss. Keep run elevation loss
 and interval average/maximum power when provided. Migration `002_remove_unsupported_measurements`
 drops only the unsupported columns from existing databases; apply migrations before updated services
-start. The initial migration remains immutable, and fresh databases apply both migrations.
+start. Migration `003_run_samples` adds sample storage, interval timing, and minimal power provenance.
+The initial migrations remain immutable; existing runs need a manual re-sync to populate new fields.
 
 Do not persist training periods, calendar events, readiness scores, coaching proposals, or generated
 plans. Calculate only simple deterministic summaries on demand: run totals, aggregate pace from
 qualifying distance/time pairs, and count/minimum/maximum/mean for a single health metric. Always
 return units, date bounds, sample counts, missingness, provenance, and synchronization coverage.
 
-Synchronization is exclusively user-triggered:
+Imports are exclusively user-triggered through the web UI and its HTTP API, for an explicitly
+selected range of at most 90 inclusive local dates. Each import fetches the full approved dataset
+for those dates again; it does not skip previously imported records or derive dates from history.
+There is no general CLI. Compose runs a dedicated migration bootstrap before services start.
+Normalized export remains a core library capability.
 
-- recent: refresh the last 15 local dates;
-- range: refresh an explicitly selected date range of at most 90 inclusive local dates;
-- all: reconcile all previously imported ranges.
-
-Use bounded 90-day request windows, end-to-end timeouts, bounded retry/backoff with `Retry-After`,
-rate-limit observations, runtime response validation, and transactional upserts. Retain only the
-approved normalized fields. Preserve the last valid records on partial or failed imports. Absence from an incomplete
-response never proves deletion. Opening the app, reading local APIs, querying MCP, and restarting
+Use bounded 90-day request windows and end-to-end timeouts. Imports stop on the first failed request
+without automatic retry, including rate limits and server errors, per the approved all-or-nothing policy.
+Keep rate-limit observations, runtime response validation, and transactional upserts. Retain only the
+approved normalized fields. Stage normalized records in disposable SQLite during downloads, then publish
+all runs, intervals, samples, wellness, coverage, and the completed sync record in one transaction.
+Any request, validation, or persistence failure aborts the entire batch, including earlier windows.
+Cancellation and lease loss discard the batch too. Keep failure history/issue metadata while preserving
+the last committed data and coverage timestamps. Absence from an incomplete response never proves
+deletion. Opening the app, reading local APIs, querying MCP, and restarting
 containers must not contact Intervals.icu.
 
 ## Athlete wiki and MCP
@@ -101,22 +112,26 @@ sync dates leaves both lists and their pagination unchanged; importing requires 
 Runs display distance, moving time, and average heart rate; health rows display resting heart rate,
 HRV, sleep, and weight. Missing measurements remain explicit. Navigation, charts, summaries, run
 details, and sync-history screens are removed. The button waits for the import outcome, then
-refreshes both lists. Range imports via API/CLI share the 90-day cap; historical imports can be
-split into explicit ranges. `all` retains reconciliation of existing history using bounded windows.
+refreshes both lists. Web/API range imports share the 90-day cap; historical imports can be
+split into explicit ranges.
 Disable polling and automatic focus/reconnect refetches. Clearly distinguish loading, empty,
-missing, and failed states, and show partial sync outcomes.
+missing, and failed states, and show aborted imports with zero saved records.
 
 Overlapping imports upsert runs by activity ID and health by date, updating existing measurements
 without duplicates. Valid run details replace intervals transactionally; failed detail requests
 preserve the stored run and intervals. Missing upstream records are not automatically deleted.
 Only one sync writer is allowed at a time, including requests for different ranges.
+The form is disabled only while its own import request is pending; cached status never permanently
+locks Sync. The server enforces concurrency with the writer lease and returns 409 for genuine overlaps.
+An active sync must own an unexpired writer lease. Abandoned history is marked interrupted when the
+next import acquires the lease; reading status never contacts upstream or starts recovery imports.
 
 Fastify provides bounded, schema-validated endpoints for runs, run details, health observations,
 summaries, data status, and manual sync/history/details. Run and health list endpoints accept
 optional paired start/end dates; omitting both returns all stored records with pagination and a
 maximum page size of 50. Existing date-filtered reads remain supported. `POST /api/sync-runs` executes the import
-inside the request and returns `200` with its final sync record, including completed, partial, failed,
-or interrupted status. There are no background import tasks or progress streams. A competing request
+inside the request and returns `200` with its final completed, failed, or interrupted sync record.
+Historical partial records remain readable. There are no background import tasks or progress streams. A competing request
 returns `409` with the active sync. Client disconnection or API shutdown cancels upstream requests
 and retry waits, records interruption, and releases the writer lease. Keep credentials server-side,
 redact logs, validate host/origin headers, and bound bodies, ranges, pages, and responses.
@@ -131,7 +146,8 @@ Only Nginx publishes `${TAILSCALE_IP}:8080`. API and MCP stay on the internal Co
 serves the SPA, proxies `/api` and `/mcp`, preserves protocol headers, and disables buffering for MCP
 streams. Deployment assumes the host already participates in Tailscale. Authentication is outside v1; host/origin validation and request limits remain enabled.
 
-Provide a normalized JSON export command. The one-time fresh start deletes only this application's
+Retain normalized JSON export through the core library function. The general CLI is removed;
+Compose invokes a dedicated migration bootstrap. The one-time fresh start deletes only this application's
 legacy database and data archives after writers stop; credentials, configuration, and wiki persist.
 
 ## Acceptance

@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
-import { loadConfig, mapActivity, mapWellness } from '@hub/core';
+import { loadConfig, mapActivity, mapRunStreams, mapWellness } from '@hub/core';
 import { Store } from '@hub/db';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -18,7 +18,14 @@ test('MCP client discovers bounded semantic tools, validates inputs, and never i
     { id: 'i123', type: 'Run', start_date_local: '2026-09-20T08:00:00', icu_intervals: [] },
     true,
   );
-  await store.saveRun(mapped.run, mapped.intervals);
+  await store.saveRun(
+    mapped.run,
+    mapped.intervals,
+    mapRunStreams('i123', [
+      { type: 'time', data: [0, 5] },
+      { type: 'heartrate', data: [100, null] },
+    ]),
+  );
   await store.saveWellness(mapWellness({ id: '2026-09-20', restingHR: 50 }));
   const dir = await mkdtemp(join(tmpdir(), 'hub-mcp-'));
   const config = loadConfig({ WIKI_PATH: join(dir, 'wiki') });
@@ -29,13 +36,26 @@ test('MCP client discovers bounded semantic tools, validates inputs, and never i
   await client.connect(right);
   try {
     const listed = await client.listTools();
-    assert.equal(listed.tools.length, 11);
+    assert.equal(listed.tools.length, 12);
     assert.ok(listed.tools.every((tool) => !['sql', 'fetch', 'sync'].includes(tool.name)));
     const result = await client.callTool({ name: 'get_data_status', arguments: {} });
     const content = result.content as { type: string; text: string }[];
     assert.equal(JSON.parse(content[0].text).run_count, 1);
     const run = await client.callTool({ name: 'get_run', arguments: { id: 'i123' } });
     assert.equal(JSON.parse((run.content as { text: string }[])[0].text).run.id, 'i123');
+    const samples = await client.callTool({
+      name: 'get_run_samples',
+      arguments: { id: 'i123', limit: 1, offset: 1 },
+    });
+    const samplePage = JSON.parse((samples.content as { text: string }[])[0].text);
+    assert.equal(samplePage.total, 2);
+    assert.equal(samplePage.items[0].elapsed_s, 5);
+    assert.equal(samplePage.items[0].hr_bpm, null);
+    const invalidSamples = await client.callTool({
+      name: 'get_run_samples',
+      arguments: { id: 'i123', limit: 101 },
+    });
+    assert.equal(invalidSamples.isError, true);
     const health = await client.callTool({
       name: 'get_health_data',
       arguments: { start: '2026-09-20', end: '2026-09-20' },
@@ -105,7 +125,7 @@ test('Streamable HTTP initializes, lists and calls tools; validates Origin and m
       payload: { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} },
     });
     assert.equal(tools.statusCode, 200);
-    assert.equal(tools.json().result.tools.length, 11);
+    assert.equal(tools.json().result.tools.length, 12);
     const call = await app.inject({
       method: 'POST',
       url: '/mcp',

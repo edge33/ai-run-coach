@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import type { RunInterval } from '@hub/contracts';
+import { type RunInterval, runSampleSchema } from '@hub/contracts';
 import { Migrator } from 'kysely/migration';
 import { type RunRow, Store } from '../src/index.ts';
 import { initialMigration } from '../src/migrations/001_initial.ts';
@@ -27,6 +27,8 @@ function run(id = 'run-one'): RunRow {
     training_load: null,
     synced_at: '2026-09-20T10:00:00Z',
     details_status: 'complete',
+    power_source: null,
+    samples_synced_at: null,
   };
 }
 function interval(): RunInterval {
@@ -34,6 +36,12 @@ function interval(): RunInterval {
     run_id: 'run-one',
     sequence: 0,
     interval_type: 'WORK',
+    label: null,
+    start_index: null,
+    end_index: null,
+    start_time_s: null,
+    end_time_s: null,
+    moving_time_s: null,
     duration_s: 1900,
     distance_m: 5000,
     avg_speed_mps: null,
@@ -170,6 +178,59 @@ test('failed interval replacement rolls back the run', async () => {
   }
 });
 
+test('sample pages are bounded; sample failures roll back run, intervals and samples; deletion cascades', async () => {
+  const store = new Store(':memory:');
+  await store.migrate();
+  const samples = Array.from({ length: 105 }, (_, index) =>
+    runSampleSchema.parse({
+      run_id: 'run-one',
+      sample_index: index,
+      elapsed_s: index * 2,
+      distance_m: index * 5,
+      speed_mps: 2.5,
+      hr_bpm: index === 0 ? null : 140,
+      power_w: 0,
+      raw_power_w: null,
+      altitude_m: -5,
+      corrected_altitude_m: -4,
+      cadence_rpm: 80,
+    }),
+  );
+  try {
+    await store.saveRun(run(), [{ ...interval(), start_index: 0, end_index: 105 }], samples);
+    const first = await store.getRunSamples('run-one');
+    const second = await store.getRunSamples('run-one', 100, 100);
+    assert.equal(first?.items.length, 100);
+    assert.equal(first?.total, 105);
+    assert.deepEqual(
+      second?.items.map((s) => s.sample_index),
+      [100, 101, 102, 103, 104],
+    );
+    assert.equal(first?.synced_at, run().synced_at);
+    assert.equal(await store.getRunSamples('unknown'), null);
+    await assert.rejects(store.getRunSamples('run-one', 101));
+    await assert.rejects(store.saveRun(run(), [interval()], [{ ...samples[0], run_id: 'other' }]));
+    await assert.rejects(
+      store.saveRun(run(), [{ ...interval(), start_index: 3, end_index: 1 }], samples),
+    );
+    await assert.rejects(store.saveRun(run(), [{ ...interval(), end_index: 106 }], samples));
+    const saved = await store.getRun('run-one');
+    store.sqlite.exec(`CREATE TRIGGER synthetic_sample_failure BEFORE INSERT ON run_samples
+      WHEN NEW.sample_index = 51 BEGIN SELECT RAISE(ABORT, 'synthetic failure'); END`);
+    await assert.rejects(store.saveRun({ ...run(), distance_m: 999 }, [], samples));
+    assert.deepEqual(await store.getRun('run-one'), saved);
+    assert.deepEqual(await store.getRunSamples('run-one'), first);
+    store.sqlite.exec('DROP TRIGGER synthetic_sample_failure');
+    await store.saveRun(run(), null);
+    assert.equal((await store.getRunSamples('run-one'))?.synced_at, run().synced_at);
+    store.sqlite.prepare('DELETE FROM runs WHERE id = ?').run('run-one');
+    assert.equal((await store.db.selectFrom('run_samples').selectAll().execute()).length, 0);
+    assert.deepEqual(store.sqlite.pragma('foreign_key_check'), []);
+  } finally {
+    await store.close();
+  }
+});
+
 test('upgrade removes only unsupported columns and preserves records, indexes, strict tables, and foreign keys', async () => {
   const store = new Store(':memory:');
   try {
@@ -203,6 +264,15 @@ test('upgrade removes only unsupported columns and preserves records, indexes, s
     const expectedLease = store.sqlite.prepare('SELECT * FROM leases').get();
     delete expectedRun.max_power_w;
     delete expectedInterval.elevation_loss_m;
+    Object.assign(expectedRun, { power_source: null, samples_synced_at: null });
+    Object.assign(expectedInterval, {
+      label: null,
+      start_index: null,
+      end_index: null,
+      start_time_s: null,
+      end_time_s: null,
+      moving_time_s: null,
+    });
 
     await store.migrate();
     await store.migrate();
@@ -212,12 +282,16 @@ test('upgrade removes only unsupported columns and preserves records, indexes, s
     assert.deepEqual(saved?.intervals, [expectedInterval]);
     assert.deepEqual(store.sqlite.prepare('SELECT * FROM wellness').get(), expectedWellness);
     assert.deepEqual(store.sqlite.prepare('SELECT * FROM leases').get(), expectedLease);
-    assert.equal(store.sqlite.prepare('SELECT * FROM kysely_migration').all().length, 2);
+    assert.equal(store.sqlite.prepare('SELECT * FROM kysely_migration').all().length, 3);
+    assert.equal((await store.getRunSamples('run-one'))?.total, 0);
+    assert.equal((await store.getRunSamples('run-one'))?.synced_at, null);
+    assert.equal(store.sqlite.prepare('SELECT * FROM run_samples').all().length, 0);
     const indexes = store.sqlite.pragma('index_list(runs)') as { name: string }[];
     assert.ok(indexes.some((index) => index.name === 'runs_start_time_id_idx'));
     const tables = store.sqlite.pragma('table_list') as { name: string; strict: number }[];
     assert.equal(tables.find((table) => table.name === 'runs')?.strict, 1);
     assert.equal(tables.find((table) => table.name === 'run_intervals')?.strict, 1);
+    assert.equal(tables.find((table) => table.name === 'run_samples')?.strict, 1);
     assert.deepEqual(store.sqlite.pragma('foreign_key_check'), []);
     assert.throws(() =>
       store.sqlite

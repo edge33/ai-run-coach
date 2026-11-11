@@ -1,19 +1,24 @@
 import { randomUUID } from 'node:crypto';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   addDays,
+  type Coverage,
   type DateRange,
-  DEFAULT_SYNC_DAYS,
   localToday,
   MAX_SYNC_DAYS,
   type SyncRequest,
   type SyncRun,
+  syncRequestSchema,
   validateRange,
 } from '@hub/contracts';
-import type { Store } from '@hub/db';
+import { Store } from '@hub/db';
 import { z } from 'zod';
-import type { Config } from './config.ts';
+import { type Config, logger } from './config.ts';
 import { IntervalsClient, UpstreamError } from './intervals.ts';
 import { activitySchema, mapActivity, mapWellness, runningTypes } from './mapping.ts';
+import { mapRunStreams } from './streams.ts';
 
 export function splitWindows(ranges: DateRange[]): DateRange[] {
   return ranges.flatMap((range) => {
@@ -40,14 +45,8 @@ export async function beginSync(
   timezone: string,
 ): Promise<SyncRun> {
   const today = localToday(timezone);
-  const ranges =
-    request.mode === 'range'
-      ? [validateRange({ start: request.start, end: request.end }, MAX_SYNC_DAYS)]
-      : request.mode === 'all'
-        ? await store.importedRanges()
-        : [{ start: addDays(today, 1 - DEFAULT_SYNC_DAYS), end: today }];
-
-  if (!ranges.length) ranges.push({ start: addDays(today, 1 - DEFAULT_SYNC_DAYS), end: today });
+  const input = syncRequestSchema.parse(request);
+  const ranges = [validateRange({ start: input.start, end: input.end }, MAX_SYNC_DAYS)];
 
   if (ranges.some((range) => range.end > today))
     throw new Error('Future dates cannot be synchronized');
@@ -93,11 +92,9 @@ export async function executeSync(
   options: { fetch?: typeof fetch; signal?: AbortSignal } = {},
 ) {
   const run = await store.syncRun(id);
-
   if (run?.status !== 'running') throw new Error('SYNC_NOT_RUNNING');
 
   let leaseLost = false;
-
   const heartbeat = setInterval(() => {
     void store
       .renewLease(id)
@@ -108,24 +105,18 @@ export async function executeSync(
         leaseLost = true;
       });
   }, 10000);
-
-  const publish = async () => {
-    await store.updateSync(id, run);
-  };
-
+  const publish = () => store.updateSync(id, run);
   const assertLease = async () => {
     options.signal?.throwIfAborted();
-
     if (leaseLost) throw new Error('LEASE_LOST');
-
     await store.assertLease(id);
   };
-
   const client = new IntervalsClient({
     apiKey: config.apiKey,
     athleteId: config.athleteId,
     fetch: options.fetch,
     signal: options.signal,
+    retry: false,
     onRequest: async () => {
       await assertLease();
       run.requests++;
@@ -133,125 +124,118 @@ export async function executeSync(
     },
   });
 
-  let failedWindows = 0;
+  let staged: Store | undefined;
+  let directory: string | undefined;
+  let resource: 'runs' | 'health' = 'runs';
+  let recordRef: string | null = null;
+  let inRecord = false;
+  let errorCode = 'IMPORT_FAILED';
+  let stagedCount = 0;
+  const coverage: Coverage[] = [];
 
   try {
-    for (const range of splitWindows(
-      z.array(z.object({ start: z.string(), end: z.string() })).parse(JSON.parse(run.ranges_json)),
-    )) {
-      for (const resource of ['runs', 'health'] as const) {
+    // Only normalized rows are staged. Live measurements change only after every request succeeds.
+    directory = await mkdtemp(join(tmpdir(), 'hub-import-'));
+    staged = new Store(join(directory, 'staged.sqlite'));
+    await staged.migrate();
+    const ranges = z
+      .array(z.object({ start: z.string(), end: z.string() }))
+      .parse(JSON.parse(run.ranges_json));
+    for (const range of splitWindows(ranges)) {
+      for (resource of ['runs', 'health'] as const) {
         await assertLease();
-        let rejectedInWindow = 0;
-
-        try {
-          const data =
-            resource === 'runs'
-              ? await client.activities(range.start, range.end)
-              : await client.wellness(range.start, range.end);
-
-          const rows = z.array(z.unknown()).max(20000).parse(data);
-
-          for (const row of rows) {
-            await assertLease();
-            run.received++;
-
-            try {
-              if (resource === 'runs') {
-                const basic = z
-                  .object({ type: z.string().optional() })
-                  .passthrough()
-                  .safeParse(row);
-
-                if (basic.success && basic.data.type && !runningTypes.has(basic.data.type))
-                  continue;
-
-                const summary = activitySchema.parse(row);
-
-                if (
-                  summary.start_date_local.slice(0, 10) < range.start ||
-                  summary.start_date_local.slice(0, 10) > range.end
-                )
-                  throw new Error('OUT_OF_RANGE');
-
-                let mapped: ReturnType<typeof mapActivity>;
-
-                try {
-                  const detail = await client.activity(summary.id);
-                  const parsed = activitySchema.parse(detail);
-
-                  if (parsed.id !== summary.id) throw new Error('ID_MISMATCH');
-
-                  mapped = mapActivity({ ...summary, ...parsed }, true);
-                } catch {
-                  rejectedInWindow++;
-                  run.rejected++;
-                  await store.issue(id, resource, 'DETAIL_UNAVAILABLE', summary.id);
-                  continue;
-                }
-
-                await assertLease();
-                await store.saveRun(mapped.run, mapped.intervals);
-              } else {
-                const mapped = mapWellness(row);
-
-                if (mapped.date < range.start || mapped.date > range.end)
-                  throw new Error('OUT_OF_RANGE');
-
-                await store.saveWellness(mapped);
-              }
-
-              run.upserted++;
-            } catch {
-              run.rejected++;
-              rejectedInWindow++;
-              await store.issue(id, resource, 'RECORD_INVALID_OR_RESTRICTED');
-            }
-          }
-
+        recordRef = null;
+        errorCode = 'WINDOW_FAILED';
+        const data =
+          resource === 'runs'
+            ? await client.activities(range.start, range.end)
+            : await client.wellness(range.start, range.end);
+        const rows = z.array(z.unknown()).max(20000).parse(data);
+        for (const row of rows) {
           await assertLease();
-
-          if (rejectedInWindow === 0)
-            await store.markCoverage({
-              ...range,
-              resource,
-              synced_at: new Date().toISOString(),
-              run_id: id,
-            });
-          else failedWindows++;
-        } catch (error) {
-          failedWindows++;
-          const code = error instanceof UpstreamError ? error.code : 'WINDOW_FAILED';
-          run.error_code = code;
-          await store.issue(id, resource, code);
+          run.received++;
+          inRecord = true;
+          recordRef = null;
+          errorCode = 'RECORD_INVALID_OR_RESTRICTED';
+          if (resource === 'runs') {
+            const basic = z.object({ type: z.string().optional() }).safeParse(row);
+            if (basic.success && basic.data.type && !runningTypes.has(basic.data.type)) {
+              inRecord = false;
+              continue;
+            }
+            const summary = activitySchema.parse(row);
+            recordRef = summary.id;
+            if (
+              summary.start_date_local.slice(0, 10) < range.start ||
+              summary.start_date_local.slice(0, 10) > range.end
+            )
+              throw new Error('OUT_OF_RANGE');
+            errorCode = 'DETAIL_UNAVAILABLE';
+            const parsed = activitySchema.parse(await client.activity(summary.id));
+            if (parsed.id !== summary.id) throw new Error('ID_MISMATCH');
+            const mapped = mapActivity({ ...summary, ...parsed }, true);
+            errorCode = 'STREAMS_UNAVAILABLE';
+            const samples = mapRunStreams(summary.id, await client.streams(summary.id));
+            await assertLease();
+            errorCode = 'RECORD_INVALID_OR_RESTRICTED';
+            await staged.saveRun(mapped.run, mapped.intervals, samples);
+          } else {
+            const mapped = mapWellness(row);
+            recordRef = mapped.date;
+            if (mapped.date < range.start || mapped.date > range.end)
+              throw new Error('OUT_OF_RANGE');
+            await staged.saveWellness(mapped);
+          }
+          stagedCount++;
+          inRecord = false;
         }
-
-        options.signal?.throwIfAborted();
+        coverage.push({ ...range, resource, synced_at: new Date().toISOString(), run_id: id });
         run.completed_windows++;
         await publish();
       }
     }
-
-    run.status =
-      failedWindows === 0
-        ? 'completed'
-        : run.upserted > 0 || failedWindows < run.total_windows
-          ? 'partial'
-          : 'failed';
-
-    if (run.rejected && !run.error_code) run.error_code = 'SOME_RECORDS_UNAVAILABLE';
-  } catch {
-    run.status = 'interrupted';
-    run.error_code = 'WORKER_INTERRUPTED';
+    await assertLease();
+    errorCode = 'IMPORT_COMMIT_FAILED';
+    recordRef = null;
+    // No network requests remain. Renew the lease inside the short atomic publication transaction.
+    clearInterval(heartbeat);
+    run.status = 'completed';
+    run.upserted = stagedCount;
+    run.completed_at = new Date().toISOString();
+    await store.commitImport(staged, run, coverage, options.signal);
+  } catch (error) {
+    const lostLease = error instanceof Error && error.message === 'LEASE_LOST';
+    const interrupted = options.signal?.aborted || lostLease;
+    run.status = interrupted ? 'interrupted' : 'failed';
+    run.upserted = 0;
+    run.rejected = !interrupted && inRecord ? 1 : 0;
+    run.error_code = lostLease
+      ? 'LEASE_LOST'
+      : interrupted
+        ? 'WORKER_INTERRUPTED'
+        : error instanceof UpstreamError && errorCode === 'WINDOW_FAILED'
+          ? error.code
+          : errorCode;
+    await store.issue(id, resource, run.error_code, recordRef);
   } finally {
     clearInterval(heartbeat);
-    run.completed_at = new Date().toISOString();
-
     try {
-      await publish();
+      if (run.status !== 'completed') {
+        run.completed_at = new Date().toISOString();
+        await publish();
+      }
     } finally {
-      await store.releaseLease(id);
+      try {
+        await store.releaseLease(id);
+      } finally {
+        try {
+          await staged?.close();
+          if (directory) await rm(directory, { recursive: true, force: true });
+        } catch {
+          logger.warn({ code: 'STAGING_CLEANUP_FAILED' }, 'Unable to remove temporary import data');
+        }
+      }
     }
   }
-
   return run;
 }

@@ -1,4 +1,4 @@
-import type { Coverage, Run, RunInterval, SyncRun, Wellness } from '@hub/contracts';
+import type { Coverage, Run, RunInterval, RunSample, SyncRun, Wellness } from '@hub/contracts';
 
 export type RunRow = Run;
 export type IntervalRow = RunInterval;
@@ -19,6 +19,7 @@ interface Lease {
 export interface Database {
   runs: RunRow;
   run_intervals: IntervalRow;
+  run_samples: RunSample;
   wellness: WellnessRow;
   sync_runs: SyncRun;
   coverage: Coverage;

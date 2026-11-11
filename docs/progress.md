@@ -1,8 +1,313 @@
 # Running Data Hub progress
 
-Last updated: 2026-11-09
+Last updated: 2026-11-11
 
-## Published UI/schema PR (current)
+## Independent verification review (current)
+
+- User requested another sub-agent code review and verification of earlier findings. Reviewer
+  inspected tracked/untracked accumulated changes on `money-hedgehog`, HEAD `50338e6`; no new
+  confirmed implementation defect found. Summary run/health reads use the same transaction and
+  separate-connection regressions verify concurrent publication. Expired active status/retry recovery
+  is fixed. History-derived modes are rejected at HTTP/core boundaries; their date-selection helper
+  and general CLI are gone, so the sparse-history import path is removed. Old stored mode labels
+  and historical log entries do not enable imports. The user-set-aside all-null parser issue remains
+  unchanged and excluded, not claimed fixed.
+- Reviewer independently ran core (26), DB (6), web (8), API/bootstrap (8), and MCP (3) tests:
+  all 51 pass. API's initial in-sandbox run passed 7/8; socket bind failed with EPERM, and the
+  outside-sandbox rerun passes all 8. Synthetic Compose config validation passes with loopback
+  settings and empty credentials. Primary `git diff --check` passes. Full gates passed in the prior
+  implementation session; browser/Compose startup and CI were not repeated in this review.
+- Reviewer noted stale current-operation documentation still advertised removed migration/export
+  commands. Corrected Local operation below and implementation-plan Deployment wording to the
+  dedicated bootstrap and core export function. No runtime changes, athlete data/credentials,
+  live upstream requests, commits, pushes, merges, or deployment. All accumulated changes remain
+  uncommitted. Next action: review/commit accumulated work and finish outstanding source/Compose/CI
+  checks before deployment; no unresolved prior actionable finding remains in this review scope.
+
+## Summary read consistency fixed (current)
+
+- User authorized applying review issue 2's summary fix. `summarizeRuns` and `summarizeHealth` now
+  retrieve measurements and coverage through the same transaction connection. Calculations run
+  after the transaction closes. API and MCP share these functions; no application reader lock,
+  upstream request, schema migration, or changes to summary response contracts were added.
+- Added `packages/core/tests/summary-snapshots.test.ts`: disposable file-backed SQLite with separate
+  reader/writer connections in WAL mode. A Kysely result plugin publishes a real synthetic import
+  after the measurement SELECT and before the coverage SELECT. Both summaries retain the prior
+  measurements and coverage together, while the next request sees the newly committed import.
+  Both tests fail on the unfixed code specifically because coverage belongs to the newer import.
+- Validation: `pnpm --filter @hub/core test` passes all 26 tests; all full gates pass:
+  `pnpm run check` (74 files), `pnpm run typecheck` (6 tasks), `pnpm run lint` (7 tasks),
+  `pnpm test` (51 tests: DB 6, core 26, API/bootstrap 8, MCP 3, web 8), `pnpm run build`, and
+  `git diff --check`. Full tests used socket/subprocess permissions outside the sandbox; Turbo
+  emitted read-only cache warnings inside it. Initial test fixtures lacked optional run measurements,
+  causing an expected missingness warning; fixtures were completed and tests rerun successfully.
+  Biome's initial import-format finding was corrected. A baseline probe without the project's
+  `--test-isolation=none` failed to run the test file under the sandbox; retry using that option
+  reproduced both intended assertion failures, and fixed code was restored before final validation.
+- Worktree/branch `money-hedgehog`, HEAD `50338e6`; this follow-up changes only summaries, its new
+  regression test, and tracker/progress docs on top of the preserved accumulated uncommitted edits.
+  No athlete data/credentials, live imports, deployment, commit, push, or merge. Compose/browser
+  checks were not repeated for this internal read change. The user-set-aside all-null issue remains
+  untouched. Next action: review/commit accumulated work and complete outstanding source/Compose/CI
+  verification before deployment; no remaining blocker was identified for this summary fix.
+
+## Explicit-date imports only (current)
+
+- User chose full pulls for selected dates, removed history-based import modes and the general CLI,
+  and requested a proposal only for summary consistency. The omitted all-null stream finding is
+  explicitly set aside by the user; it was not changed. Summary code is also unchanged.
+- Import requests now require `mode: range`, start, and end; removed automatic date selection and
+  history-derived ranges from core and removed `importedRanges` from the DB repository/facade.
+  Every selected date is fetched again regardless of existing coverage, including activity lists,
+  details/intervals, streams, and wellness. Existing IDs/dates are updated without duplicates, with
+  the existing batch-wide rollback policy and 90-day cap. Missing upstream records still are not
+  implicitly deleted; this change removes incremental/history-mode decisions, not retention policy.
+- Removed `apps/api/src/cli.ts` and root migration/export commands. Compose now runs a dedicated
+  `apps/api/src/migrate.ts` deployment bootstrap before starting services. Normalized export remains
+  a core library function. Historical mode labels remain readable as text in sync history; they
+  cannot start new imports. No database migration or athlete backfill is required for this change.
+- Updated API validation tests, converted DST coverage to explicit dates, replaced obsolete
+  reconciliation tests with a full reimport regression, and added a repeatable deployment-bootstrap
+  subprocess test. Removed the obsolete CLI tests. Source/operational docs and repository guidance
+  reflect the explicit-date workflow; older entries below remain historical execution records.
+- Validation: `pnpm run check` passes (73 files), `pnpm run typecheck` passes (6 tasks),
+  `pnpm run lint` passes (7 tasks), `pnpm test` passes 49 tests (DB 6, core 24, API/bootstrap 8,
+  MCP 3, web 8), `pnpm run build`, and `git diff --check` pass. Full tests ran outside the sandbox
+  for socket/subprocess support; Turbo emitted read-only cache warnings inside it.
+  Initial Compose config validation lacked required TAILSCALE_IP; retry with disposable synthetic
+  environment and `--env-file /dev/null` passes. No Compose startup/browser check was performed.
+- Summary proposal (not implemented): retrieve measurements and coverage in one SQLite read
+  transaction for run and health summaries; test a concurrent import publication between the reads.
+  This preserves readable committed data during imports and avoids application-level reader locks.
+- Branch/worktree `money-hedgehog`, HEAD `50338e6`; all accumulated edits remain uncommitted.
+  No athlete data/credentials were accessed, live import or migration performed, or commit/push/
+  merge/deployment made. Next action: review this explicit-date simplification; implement summary
+  consistency only when requested, then complete outstanding source/Compose/CI verification.
+
+## Independent sub-agent code review (current)
+
+- User requested an independent sub-agent review of all accumulated tracked and untracked changes
+  against HEAD `50338e6` on branch/worktree `money-hedgehog`. No implementation fixes were made.
+- Three P2 findings: `packages/core/src/streams.ts:21` requires `data` before handling an all-null
+  stream, so `{type: 'heartrate', allNull: true}` rejects a valid source shape and aborts the batch;
+  the previously known summary measurement/coverage snapshot race and sparse-history expansion in
+  API `all` remain. The reviewer independently reproduced all three with synthetic mapper and
+  in-memory SQLite probes. The public OpenAPI `ActivityStream` schema has no required `data` field
+  (`https://intervals.icu/api/v1/docs`, checked this session). This validates the allowed shape,
+  rather than establishing its frequency in live athlete responses.
+- Reviewer reran `pnpm --filter @hub/core test` (25 passed) and `pnpm --filter @hub/db test`
+  (6 passed). Existing stream tests cover explicit null/empty data but omit the missing-property case.
+  No further confirmed substantive issue was found in lease recovery, web import control, migration,
+  sample pagination, or batch publication. Full gates, browser, Compose, and live imports were not
+  repeated for this review. No athlete data or credentials were accessed.
+- Public-schema fetch initially failed sandbox DNS (`EAI_AGAIN`); the read-only request succeeded
+  outside the sandbox. Documentation changes pass `git diff --check`.
+- Next action: fix the three findings with regressions before release. All accumulated changes
+  remain uncommitted; no commit, push, merge, or deployment was performed.
+
+## Web-controlled imports and expired-writer recovery (current)
+
+- User chose web UI control for imports without CLI access. Removed the root `sync` script and CLI
+  sync branch. Unsupported commands, including `sync all`, are rejected before opening a database.
+  CLI migration/export maintenance commands and Compose's migration entry point remain available;
+  MCP still has no import tool. HTTP import contracts remain compatible with existing clients.
+- Fixed review issue 2: `activeSync` requires a running sync to own the unexpired writer lease.
+  Expired/absent/other-owner leases cannot make a stale running history row active. The form disables
+  controls only for its pending mutation, so previously cached active status cannot lock it forever.
+  The server still rejects genuine overlapping requests with 409. After expiry, the next web import
+  acquires the lease and marks abandoned history interrupted. Status reads make no upstream calls and
+  do not mutate history. No polling, timers, focus/reconnect refetching, or automatic imports added.
+- Validation on Node 26.13.0 / pnpm 12.18.0: `pnpm run check` passes (73 files),
+  `pnpm run typecheck` passes (6 tasks), `pnpm run lint` passes (7 tasks), `pnpm test` passes
+  all 51 tests (DB 6, core 25, API/maintenance CLI 9, MCP 3, web 8), `pnpm run build` and
+  `git diff --check` pass. Full tests ran outside the sandbox for API sockets and subprocesses.
+  Turbo emitted read-only cache warnings inside the sandbox. Browser/Compose checks were not run.
+- Regressions verify expired leases disappear from status without upstream reads; a web request
+  recovers abandoned history and completes; stale cached active status allows a user attempt,
+  displays a real 409 overlap error, then permits retry; CLI imports cannot even create a database;
+  deployment migration and normalized export still work against disposable synthetic data.
+- Continued on worktree/branch `money-hedgehog`, HEAD `50338e6`, preserving accumulated uncommitted
+  sample-storage/atomic-import/review changes. This follow-up changes root package scripts,
+  `apps/api/src/cli.ts`, API tests, new `apps/api/tests/cli.test.ts`, web App/sync tests,
+  DB sync repository, and code-map/implementation-plan/run-analysis/tracker/progress docs.
+  No dependency/lockfile change, athlete-data access/write, live import, migration of the athlete DB,
+  commit, push, merge, or deployment was performed.
+- Remaining confirmed bugs: review issue 1 (summary measurement/coverage snapshot consistency)
+  and issue 3 (sparse-history expansion in API `all` reconciliation). The web form uses explicit ranges;
+  `all` is not a UI option. Next action: fix the remaining issues with regressions, then review/commit
+  and deploy updated services/assets. No new migration is needed for this follow-up.
+
+## Post-import review: three reproduced issues
+
+- User asked whether bugs remain. Reviewed import, lease recovery, coverage, and summary reads;
+  reproduced three issues using only in-memory SQLite, synthetic upstream responses, and explicit
+  read interleaving (`node --input-type=module` from the root). No implementation changes were made
+  in this review; the 47-test result below predates these probes and does not cover them.
+- Summary snapshot race (`packages/core/src/summaries.ts`): measurement rows and coverage are
+  separate reads. Start with a completed empty import, read summary rows, commit a successful import
+  of one synthetic run before the coverage read, then finish the summary. Observed sample_size 0,
+  actual run count 1, coverage pointing to the new import, and no warnings. Run and health summaries
+  need a consistent SQLite read transaction for measurements and their coverage.
+- Expired active sync blocks UI recovery (`packages/db/src/sync.ts`, `apps/web/src/App.tsx`): create
+  a running sync, expire its writer lease, then call `dataStatus`. Observed active.status running;
+  UI busy remains true because it trusts any active row. Recovery currently runs only after starting
+  another sync, while the disabled button prevents that path. Separate running history from a valid
+  active lease, or provide equivalent recovery without upstream access.
+- Sparse-history expansion (`packages/db/src/sync.ts`): complete imports for two non-adjacent
+  synthetic dates, then complete `all`. Before: two separate one-day ranges. After: one continuous
+  range containing the unimported gap. `importedRanges` uses each sync's bounding start/end rather
+  than its exact `ranges_json`, so subsequent `all` requests can expand beyond imported windows.
+- Next action: fix summary snapshot consistency, expired-active recovery/UI behavior, and exact
+  reconciliation ranges, adding regression tests for each. The new batch rollback behavior passed
+  its existing regression suite; these findings do not establish a rollback failure. No live sync,
+  athlete-data read/write, commit, push, merge, or deployment was performed. Documentation-only
+  review changes pass `git diff --check`; application gates were not rerun.
+
+## All-or-nothing import policy (current)
+
+- User superseded partial imports: the first request, validation, or persistence error aborts the
+  entire requested batch. Imports make no automatic retries, including HTTP 429/5xx/network errors.
+  New outcomes are completed, failed, or interrupted; historical partial records remain readable.
+- `executeSync` stages only normalized rows in private disposable SQLite under the OS temporary
+  directory. No live measurement/coverage changes occur during downloads. `Store.commitImport`
+  publishes all staged runs/intervals/samples/wellness, coverage, and completed sync state in one
+  transaction after all windows/resources pass; repository writes reuse that transaction. Cancellation,
+  validation/write errors, or lost leases discard all staged changes and preserve the prior snapshot.
+  Failure history and one sanitized issue remain, with zero upserts. Normal completion/failure removes
+  staging files; hard crashes can leave private orphaned staging directories (no credentials/raw JSON).
+- Failed/interrupted ranges no longer expand `all` reconciliation. Historical completed/partial
+  ranges remain eligible. No schema change or additional migration is needed for this policy.
+  Old coverage timestamps remain those of the last successful snapshot; a failed refresh does not
+  establish upstream freshness. Agents must continue checking latest sync status and timestamps.
+  This is the user's chosen replacement for the earlier per-window partial-import approach; summary
+  warning logic itself was not expanded in this change.
+- Final validation on Node 26.13.0 / pnpm 12.18.0: `pnpm run check` (72 files),
+  `pnpm run typecheck` (6 tasks), `pnpm run lint` (7 tasks), `pnpm test` (47 tests: DB 6,
+  core 25 including nested failure cases, API 6, MCP 3, web 7), `pnpm run build`, and
+  `git diff --check` all pass. Tests run outside the sandbox for API sockets/MCP stdio; read-only Turbo
+  cache warnings occurred inside the sandbox. Docker/Compose and browser checks were not run.
+- Synthetic regressions cover first detail/stream/validation/network/rate-limit failures, no retries,
+  full rollback after a late publication write error, cancellation and lease takeover, unchanged live
+  reads during staging, success publication, later-window failure after earlier resources succeed,
+  failed ranges excluded from reconciliation, and the HTTP failed outcome with zero saved records.
+- Continued on worktree/branch `money-hedgehog`, HEAD `50338e6`, preserving all earlier uncommitted
+  sample-storage/power-test/docs changes. This follow-up modifies core sync/client, DB store/run/sync
+  repositories, core/API tests, and code-map/implementation-plan/run-analysis/tracker/progress docs;
+  adds `packages/core/tests/atomic-sync.test.ts`. No dependency/lockfile changes, live import, athlete
+  database write/reset/migration, commit, push, merge, or deployment were performed.
+- Next action: review/commit and restart/deploy updated services to use the new policy. Finish the
+  retained-field/unit and discarded-field/log checks, investigate selected power quality, and validate
+  Compose/CI for the accumulated revision. Local sample backfill remains complete as verified below.
+
+## Local status verification
+
+- Read-only inspection of this worktree's local SQLite database now confirms migration 003 is
+  applied. Follow-up verification after the user's backfill confirms all 17 stored runs have
+  stream-import timestamps and stored samples (41,323 samples total). All 146 intervals have start/end
+  indices and start/end times. No stored runs remain without imported streams. The latest recorded sync is
+  completed with zero rejected records. These are local observations, not production-deployment
+  evidence; this agent did not perform the intervening migration or synchronization.
+- A user-requested analysis of one stored workout successfully used summaries, exact interval
+  boundaries, and aligned samples, including distinct raw/API-selected power. The selected power
+  stream has a quality issue that raw samples help expose; availability alone is not validation of
+  measurement quality. Athlete context/wiki completeness and a coaching-agent workflow have not
+  been audited or implemented as part of this extension.
+- The earlier missing-key investigation below is historical: a later worktree configuration allowed
+  the explicitly requested read-only HR stream export. There is no established current local
+  credentials blocker. No secrets, athlete measurements, or source payloads are recorded here.
+- Implementation gates remain the 34-test/check/typecheck/lint/build results below. This status
+  refresh changes documentation only; `git diff --check` passes, and application checks were not
+  repeated. Worktree/branch remain `money-hedgehog`, HEAD `50338e6`; implementation/tests/docs
+  are uncommitted. No push/merge or production deployment has been performed in this session.
+- Next action: review/commit the extension and validate deployment/Compose for this revision.
+  Local stream backfill is complete for the currently stored runs. Finish retained-field
+  source verification and discarded-field/log validation. The former partial-import behavior is
+  superseded by the all-or-nothing policy above.
+  Then focus on wiki context and the agent coaching workflow. The legacy reset/import checklist
+  remains operationally unverified; stream backfill itself needs no database reset.
+
+## Run analysis sample storage
+
+- Worktree `/home/edge33/.paseo/worktrees/09hw1sxp/money-hedgehog`, branch `money-hedgehog`,
+  HEAD `50338e6`. Preserved the pre-existing API power regression assertions and two tracker/progress
+  edits. User approved normalized core streams and exact interval boundaries, with only minimal
+  power-source/corrected-stream identity. Weather, surface, athlete settings, goals, and availability
+  remain wiki concerns. See [run-analysis-data.md](run-analysis-data.md) for schema, source evidence,
+  limits, HTTP/MCP contracts, and deployment/backfill steps.
+- Added immutable migration `003_run_samples`: STRICT `run_samples` with cascading parent FK,
+  sample-index primary key, required elapsed seconds, nullable distance/speed/HR/power/raw-power/
+  altitude/corrected-altitude/cadence; new nullable interval indices/times/moving time/label and run
+  power source/stream-import timestamp. Negative altitude is valid. Migrations 001/002 are unchanged.
+  Existing measurements survive migration; old runs have no samples until an explicit manual re-sync.
+- Manual sync fetches only the nine approved streams. Validates aligned arrays, original indices,
+  monotonic times, bounds, measurements, and exact exclusive interval ends; preserves nulls, zeros,
+  irregular recording gaps, and distinct original/corrected streams. Up to 200,000 samples per run,
+  existing bounded upstream response/retry/timeouts, no GPS or raw JSON persistence. Run, intervals,
+  samples, and sample timestamp replace atomically; failed or invalid stream fetches preserve prior
+  records with `STREAMS_UNAVAILABLE`. Valid empty stream responses clear prior samples. Cancellation
+  preserves the previous import and releases the lease.
+- Added local `GET /api/runs/:id/samples` and shared MCP `get_run_samples`, ordered by original
+  sample index with 1–100 rows/page and offset up to 200,000. Sample pages and run detail use read
+  transactions. Pages expose their import timestamp so callers can detect re-syncs between pages.
+  Normalized export now includes `samples`; API/MCP reads never contact upstream.
+- Validation on Node 26.13.0 / pnpm 12.18.0: final `pnpm run check` passes (71 files),
+  `pnpm run typecheck` passes (6 tasks), `pnpm run lint` passes (7 tasks), `pnpm test` passes all
+  34 tests (DB 6, core 13, API 5, MCP 3, web 7), `pnpm run build` and `git diff --check` pass.
+  Tests cover migration preservation, null/zero/negative-altitude semantics, discarded fields,
+  malformed/misaligned/oversized streams, sample pagination, atomic rollback after an inserted batch,
+  repeated/edited/failed/empty imports, stream cancellation, export, and local-only HTTP/MCP reads.
+- The initial full test attempt inside the sandbox failed only API socket binding (`EPERM`) and
+  MCP stdio subprocess initialization; full runs outside the sandbox pass. Initial typecheck caught
+  an untyped SQLite result in a new test; replaced it with a typed Kysely query and all type checks
+  pass. Turbo emitted read-only shared-cache warnings inside the sandbox. Docker/Compose and browser
+  checks were not run. This implementation used disposable synthetic data only; no athlete database
+  migration/write/reset or live sync was performed. No dependency/lockfile change, commit, push,
+  merge, or deployment.
+- Uncommitted files: API routes/tests, MCP tools/protocol tests, contracts, core stream/client/
+  mapping/sync/export/index and tests, DB migration registry/003/schema/repository/store and tests,
+  plus code-map/implementation-plan/minimal-model/progress/run-analysis documentation. Private local
+  configuration, data, prior CSV/PNG exports, and wiki remain ignored and untracked.
+- Next action: review/deploy the change, run migrations before updated services, and manually
+  re-sync explicit date ranges to populate samples and boundaries. Existing unrelated stale-summary
+  coverage and remaining legacy field-verification tasks stay pending; this does not complete the
+  separate deployment reset/historical import phase.
+
+## Run and interval power API investigation
+
+- Worktree `/home/edge33/.paseo/worktrees/09hw1sxp/money-hedgehog`, branch `money-hedgehog`,
+  starting HEAD `50338e6`; initially clean. Traced activity detail GETs (`intervals=true`),
+  validation/mapping, SQLite writes/reads, and Fastify response contracts. Supported power fields
+  are retained throughout: run `icu_average_watts` becomes `avg_power_w`; interval
+  `average_watts`/`max_watts` become `avg_power_w`/`max_power_w`. No runtime fix is indicated.
+- Rechecked the public OpenAPI at `https://intervals.icu/api/v1/docs`: these source fields still
+  exist, and Activity still has no maximum-power field. Added HTTP regression assertions to the
+  existing API tests, covering synthetic manual import through HTTP reads, numeric/zero/null
+  interval power, null run power, and numeric power in run detail and list responses.
+- Earlier credential-backed findings below recorded upstream null run/interval power despite a
+  watts stream. This session could not repeat them: neither the environment nor the main
+  checkout's existing `.env` supplied an API key. No authenticated GET, athlete database read,
+  stream request, settings change, or live import occurred. Do not treat the historical samples
+  as a fresh check of the user's settings or current activities.
+- Upstream developer guidance at
+  `https://forum.intervals.icu/t/solved-run-power-not-showing/9708` recommends configuring running
+  power zones and using Update Activities for missing running power analysis. This is a possible
+  cause, not a confirmed diagnosis of the null summaries. Next action: with configured credentials,
+  inspect running FTP/zones, selected power source, ignore-power flag, and current activity summary
+  fields. Once upstream summaries exist, manually re-sync the affected dates.
+- Node 26.13.0 / pnpm 12.18.0: initial `pnpm install --frozen-lockfile` failed on the read-only shared
+  store lock; the same command passed outside the sandbox. An initial public-schema shell request
+  failed with sandbox DNS restrictions; the read-only request passed outside. The first diagnostic
+  invocation could not resolve SQLite from the root workspace; rerunning from `packages/db` exited
+  at the missing-credentials guard before reading athlete data.
+- Validation: `pnpm exec biome check --write apps/api/tests/app.test.ts` passed; `pnpm --filter
+  @hub/core test` passed 9 tests; `pnpm --filter @hub/api exec node --test --test-isolation=none
+  --test-name-pattern='HTTP reads|UI sync' tests/app.test.ts` passed 2 focused tests.
+  `pnpm run check` passed (68 files), `pnpm --filter @hub/api typecheck` passed, and
+  `git diff --check` passed. Uncommitted files: `apps/api/tests/app.test.ts`,
+  `docs/minimal-data-model-plan.md`, and `docs/progress.md`. No commit/push/merge performed. Full-suite,
+  build, browser, and Compose checks were not run for this test/documentation change.
+
+## Published UI/schema PR (previous)
 
 - User explicitly authorized push and PR publication. Committed the accumulated changes as
   `5656c16` on `clumsy-mole` and pushed to `origin/clumsy-mole` from this worktree.
@@ -527,13 +832,14 @@ tests may require execution outside the sandbox.
 ## Local operation
 
 Copy `.env.example` to `.env`, configure local paths/origins and optional Intervals credentials, then
-run `pnpm run migrate` and `pnpm run dev` (no build prerequisite). The web app runs on port 5173, the API on
+run the deployment bootstrap with `node --env-file-if-exists=.env apps/api/src/migrate.ts`, then
+`pnpm run dev` (no build prerequisite). The web app runs on port 5173, the API on
 3000, and HTTP MCP on 3001. `pnpm run build` produces only the frontend assets. `pnpm run mcp` starts the stdio transport. On this workstation, Codex starts it through the
 registered `running_data_hub` MCP server; a new Codex session is needed after registration.
-The single page’s Sync button or
-`pnpm run sync` explicitly starts an import; service startup does not.
-
-`pnpm run export DESTINATION` writes normalized JSON records into a new empty directory.
+The single page’s Sync button explicitly starts an import; service startup does not.
+The general CLI has been removed. Use the web date selection for historical imports in
+windows of at most 90 inclusive days. Compose runs the dedicated migration bootstrap before services.
+Normalized JSON export remains available through the core `exportData` library function.
 The legacy backup and restore commands have been removed. The deployment reset remains a separate,
 one-time action in the minimal-model tracker.
 

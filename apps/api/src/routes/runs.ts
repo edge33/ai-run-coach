@@ -1,10 +1,34 @@
-import { intervalSchema, recordListQuerySchema, runSchema } from '@hub/contracts';
+import {
+  intervalSchema,
+  recordListQuerySchema,
+  runSamplePageSchema,
+  runSchema,
+  sampleQuerySchema,
+} from '@hub/contracts';
 import type { Store } from '@hub/db';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { idParams, jsonSchema, pageResult, response } from './schemas.ts';
 
 export function registerRunsRoutes(routes: FastifyInstance, store: Store) {
+  routes.get(
+    '/runs/:id/samples',
+    {
+      schema: {
+        params: jsonSchema(idParams),
+        querystring: jsonSchema(sampleQuerySchema),
+        response: response(runSamplePageSchema),
+      },
+    },
+    async (request, reply) => {
+      const { id } = idParams.parse(request.params);
+      const { limit, offset } = sampleQuerySchema.parse(request.query);
+      return (
+        (await store.getRunSamples(id, limit, offset)) ??
+        reply.code(404).send({ error: 'NOT_FOUND' })
+      );
+    },
+  );
   routes.get(
     '/runs',
     {

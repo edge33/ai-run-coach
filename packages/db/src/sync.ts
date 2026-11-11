@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Coverage, DateRange, SyncRun } from '@hub/contracts';
 import type { Kysely } from 'kysely';
-import { mergeRanges } from './ranges.ts';
 import type { Database } from './schema.ts';
 
 export class SyncRepository {
@@ -44,15 +43,6 @@ export class SyncRepository {
     return query.orderBy('synced_at', 'desc').execute();
   }
 
-  async importedRanges(): Promise<DateRange[]> {
-    const rows = await this.db
-      .selectFrom('sync_runs')
-      .select(['start', 'end'])
-      .orderBy('start')
-      .execute();
-    return mergeRanges(rows);
-  }
-
   async createSync(row: SyncRun) {
     await this.db.insertInto('sync_runs').values(row).execute();
   }
@@ -82,9 +72,12 @@ export class SyncRepository {
     return (
       (await this.db
         .selectFrom('sync_runs')
-        .selectAll()
-        .where('status', '=', 'running')
-        .orderBy('started_at', 'desc')
+        .innerJoin('leases', 'leases.owner', 'sync_runs.id')
+        .selectAll('sync_runs')
+        .where('sync_runs.status', '=', 'running')
+        .where('leases.name', '=', 'writer')
+        .where('leases.expires_at', '>=', Date.now())
+        .orderBy('sync_runs.started_at', 'desc')
         .executeTakeFirst()) ?? null
     );
   }

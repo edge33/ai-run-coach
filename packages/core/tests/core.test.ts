@@ -61,13 +61,17 @@ test('local dates and bounded ranges remain independent of UTC', () => {
   assert.equal(mapActivity(activity, false).run.start_time, activity.start_date_local);
 });
 
-test('recent sync retrieves 15 local dates for runs and health across a DST boundary', async (context) => {
+test('explicit date sync retrieves 15 local dates for runs and health across a DST boundary', async (context) => {
   context.mock.timers.enable({ apis: ['Date'], now: new Date('2026-03-28T23:30:00Z') });
   const t = await setup();
   const requests: URL[] = [];
 
   try {
-    const run = await beginSync(t.store, { mode: 'recent' }, 'Europe/Rome');
+    const run = await beginSync(
+      t.store,
+      { mode: 'range', start: '2026-03-15', end: '2026-03-29' },
+      'Europe/Rome',
+    );
     assert.equal(run.start, '2026-03-15');
     assert.equal(run.end, '2026-03-29');
 
@@ -206,6 +210,7 @@ test('overlapping syncs update runs and wellness without duplicates and preserve
       ]);
     if (url.pathname.endsWith('/wellness'))
       return Response.json([{ id: '2026-09-20', hrv: distance / 1000, ctl: 10, atl: 12 }]);
+    if (url.pathname.endsWith('/streams.json')) return Response.json([]);
     return failDetail
       ? new Response('', { status: 404 })
       : Response.json({
@@ -227,7 +232,7 @@ test('overlapping syncs update runs and wellness without duplicates and preserve
         'completed',
       );
     }
-    assert.equal(calls, 6);
+    assert.equal(calls, 8);
     const overlap = { start: '2026-09-19', end: '2026-09-21' };
     assert.equal((await t.store.listRuns(overlap)).total, 1);
     const wellness = await t.store.listWellness(overlap);
@@ -253,13 +258,14 @@ test('overlapping syncs update runs and wellness without duplicates and preserve
       t.config.timezone,
     );
     const failed = await executeSync(t.store, t.config, run.id, { fetch: fakeFetch });
-    assert.equal(failed.status, 'partial');
-    assert.equal(failed.rejected, 2);
+    assert.equal(failed.status, 'failed');
+    assert.equal(failed.rejected, 1);
+    assert.equal(failed.upserted, 0);
     assert.deepEqual(await t.store.getRun('i123'), saved);
     assert.equal(await t.store.getRun('new-run'), null);
     assert.deepEqual(
       (await t.store.issues(run.id)).map((issue) => issue.code),
-      ['DETAIL_UNAVAILABLE', 'DETAIL_UNAVAILABLE'],
+      ['DETAIL_UNAVAILABLE'],
     );
     failDetail = false;
     emptyDetail = true;

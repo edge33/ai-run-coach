@@ -8,9 +8,12 @@ This guide locates the implementation within those boundaries.
 - `index.ts` preserves the package's public exports.
 - `store.ts` owns the SQLite connection, readiness checks, and cross-table counts. Its public methods
   delegate to repositories sharing the same Kysely connection.
+  `commitImport` publishes a disposable staging Store's normalized records, coverage, and completed
+  sync state in one transaction after downloads finish; repository writes reuse that transaction.
 - `schema.ts` defines persisted row types; `migrations.ts` registers immutable modules under
   `migrations/`. Migration 002 removes unsupported run maximum power and interval elevation loss.
-- `runs.ts` reads and writes runs and intervals together, preserving their transaction boundary.
+  Migration 003 adds aligned samples and interval boundaries without resetting records.
+- `runs.ts` writes runs, intervals, and samples transactionally and provides bounded sample reads.
 - `health.ts` reads and upserts daily wellness rows.
 - `leases.ts` manages the atomic writer lease.
 - `sync.ts` stores sync history, recovery state, issues, and coverage.
@@ -28,13 +31,19 @@ endpoints. `routes/schemas.ts` contains shared HTTP schema adapters and response
 `routes/sync.ts` awaits the importer directly inside `POST /api/sync-runs` and returns the final
 sync record. Request disconnection and application shutdown cancel upstream requests and retry waits.
 There is no sync manager, background job, or SSE endpoint. The SQLite writer lease excludes competing
-imports, including the CLI. Route modules receive dependencies explicitly under the `/api` prefix.
+imports from concurrent browser requests. Route modules receive dependencies explicitly under the
+`/api` prefix. `migrate.ts` is a dedicated deployment bootstrap; there is no general CLI.
+Imports accept explicit dates only and fetch the full approved dataset for those dates.
 
 ## Core (`packages/core/src`)
 
 `sync.ts` coordinates the manual ingestion workflow and its lease, counters, and failure handling.
+Imports stop at the first error, discard the whole staged batch, and retain the previous committed
+snapshot. Network requests never hold the live database's publication transaction open.
 `intervals.ts` handles bounded, cancellable upstream GET requests, while `mapping.ts` validates and
-normalizes source records. Other domain modules cover summaries, wiki operations, configuration,
+normalizes source records. `streams.ts` validates and aligns the approved measurement streams;
+see [run-analysis-data.md](run-analysis-data.md) for source mappings and API/MCP pagination.
+Other domain modules cover summaries, wiki operations, configuration,
 and normalized export. Source payloads, snapshots, and backups are not retained.
 
 ## Web (`apps/web/src`)
@@ -46,6 +55,8 @@ Their query keys contain only offsets; sync dates do not filter or reset the lis
 `api.ts` provides validated local API reads and `useSync`: click, await the result, refresh local
 queries. `components.tsx` contains empty/error notices and bounded pagination. There are no
 navigation routes, charts, summary cards, or detail screens.
+The form's busy state follows the pending mutation, not cached server status. Expired writer leases
+do not count as active imports; a new web request can acquire the lease and interrupt abandoned history.
 
 ## Reviewing changes
 

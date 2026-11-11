@@ -22,13 +22,22 @@ function warningsForCoverage(
 }
 export async function summarizeRuns(store: Store, range: DateRange): Promise<RunSummary> {
   validateRange(range);
-  let query = store.db
-    .selectFrom('runs')
-    .select(['distance_m', 'moving_time_s', 'elevation_gain_m', 'training_load'])
-    .where('start_time', '>=', range.start);
-  if (range.end !== '9999-12-31') query = query.where('start_time', '<', addDays(range.end, 1));
-  const rows = await query.execute();
-  const coverage = await store.coverage(range);
+  const { rows, coverage } = await store.db.transaction().execute(async (tx) => {
+    let query = tx
+      .selectFrom('runs')
+      .select(['distance_m', 'moving_time_s', 'elevation_gain_m', 'training_load'])
+      .where('start_time', '>=', range.start);
+    if (range.end !== '9999-12-31') query = query.where('start_time', '<', addDays(range.end, 1));
+    const rows = await query.execute();
+    const coverage = await tx
+      .selectFrom('coverage')
+      .selectAll()
+      .where('end', '>=', range.start)
+      .where('start', '<=', range.end)
+      .orderBy('synced_at', 'desc')
+      .execute();
+    return { rows, coverage };
+  });
   const warnings = warningsForCoverage(coverage, 'runs', range);
   const values: RunSummary['values'] = {};
   for (const [key, unit] of [
@@ -80,14 +89,23 @@ export async function summarizeHealth(
   metric: HealthMetric,
 ): Promise<HealthSummary> {
   validateRange(range);
-  const rows = await store.db
-    .selectFrom('wellness')
-    .select(metric)
-    .where('date', '>=', range.start)
-    .where('date', '<=', range.end)
-    .execute();
+  const { rows, coverage } = await store.db.transaction().execute(async (tx) => {
+    const rows = await tx
+      .selectFrom('wellness')
+      .select(metric)
+      .where('date', '>=', range.start)
+      .where('date', '<=', range.end)
+      .execute();
+    const coverage = await tx
+      .selectFrom('coverage')
+      .selectAll()
+      .where('end', '>=', range.start)
+      .where('start', '<=', range.end)
+      .orderBy('synced_at', 'desc')
+      .execute();
+    return { rows, coverage };
+  });
   const values = rows.flatMap((r) => (r[metric] === null ? [] : [r[metric]]));
-  const coverage = await store.coverage(range);
   const { unit, definition } = healthMetrics[metric];
   return {
     period: range,

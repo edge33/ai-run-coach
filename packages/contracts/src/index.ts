@@ -29,12 +29,17 @@ export const recordListQuerySchema = pageSchema
 
 export const DEFAULT_SYNC_DAYS = 15;
 export const MAX_SYNC_DAYS = 90;
+export const MAX_RUN_SAMPLES = 200000;
+export const sampleQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(100),
+    offset: z.coerce.number().int().min(0).max(MAX_RUN_SAMPLES).default(0),
+  })
+  .strict();
 
-export const syncRequestSchema = z.discriminatedUnion('mode', [
-  z.object({ mode: z.literal('recent') }).strict(),
-  z.object({ mode: z.literal('all') }).strict(),
-  z.object({ mode: z.literal('range'), start: dateSchema, end: dateSchema }).strict(),
-]);
+export const syncRequestSchema = z
+  .object({ mode: z.literal('range'), start: dateSchema, end: dateSchema })
+  .strict();
 export type SyncRequest = z.infer<typeof syncRequestSchema>;
 export const healthMetrics = {
   resting_hr_bpm: { field: 'restingHR', unit: 'bpm', definition: 'Resting heart rate' },
@@ -68,12 +73,20 @@ export const runSchema = z.object({
   training_load: measurement,
   synced_at: z.string(),
   details_status: z.enum(['complete', 'unavailable']),
+  power_source: z.string().max(200).nullable().default(null),
+  samples_synced_at: z.string().nullable().default(null),
 });
 export type Run = z.infer<typeof runSchema>;
 export const intervalSchema = z.object({
   run_id: z.string().min(1).max(200),
   sequence: z.number().int().nonnegative(),
   interval_type: z.string().nullable(),
+  label: z.string().max(2000).nullable().default(null),
+  start_index: z.number().int().nonnegative().nullable().default(null),
+  end_index: z.number().int().nonnegative().nullable().default(null),
+  start_time_s: measurement.default(null),
+  end_time_s: measurement.default(null),
+  moving_time_s: measurement.default(null),
   duration_s: measurement,
   distance_m: measurement,
   avg_speed_mps: measurement,
@@ -86,6 +99,33 @@ export const intervalSchema = z.object({
   avg_cadence_rpm: measurement,
 });
 export type RunInterval = z.infer<typeof intervalSchema>;
+export const runSampleSchema = z.object({
+  run_id: z.string().min(1).max(200),
+  sample_index: z
+    .number()
+    .int()
+    .min(0)
+    .max(MAX_RUN_SAMPLES - 1),
+  elapsed_s: z.number().finite().nonnegative(),
+  distance_m: measurement,
+  speed_mps: measurement,
+  hr_bpm: measurement,
+  power_w: measurement,
+  raw_power_w: measurement,
+  altitude_m: z.number().finite().nullable(),
+  corrected_altitude_m: z.number().finite().nullable(),
+  cadence_rpm: measurement,
+});
+export type RunSample = z.infer<typeof runSampleSchema>;
+export const runSamplePageSchema = z.object({
+  run_id: z.string(),
+  synced_at: z.string().nullable(),
+  power_source: z.string().nullable(),
+  items: z.array(runSampleSchema),
+  total: z.number(),
+  limit: z.number(),
+  offset: z.number(),
+});
 export const wellnessSchema = z.object({
   date: dateSchema,
   resting_hr_bpm: measurement,
@@ -101,7 +141,8 @@ export const wellnessSchema = z.object({
 export type Wellness = z.infer<typeof wellnessSchema>;
 export const syncRunSchema = z.object({
   id: z.string(),
-  mode: z.enum(['recent', 'range', 'all']),
+  // Historical mode names remain readable; new imports accept explicit ranges only.
+  mode: z.string(),
   start: z.string(),
   end: z.string(),
   ranges_json: z.string(),

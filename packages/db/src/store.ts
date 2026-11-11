@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import type { Coverage, DateRange, SyncRun, Wellness } from '@hub/contracts';
+import type { Coverage, DateRange, RunSample, SyncRun, Wellness } from '@hub/contracts';
 import SQLite from 'better-sqlite3';
 import { Kysely, SqliteDialect } from 'kysely';
 import { LeaseRepository } from './leases.ts';
@@ -52,12 +52,61 @@ export class Store {
     return this.runs.getRun(id, intervalOffset);
   }
 
-  async saveRun(run: RunRow, intervals: IntervalRow[] | null) {
-    return this.runs.saveRun(run, intervals);
+  async getRunSamples(id: string, limit = 100, offset = 0) {
+    return this.runs.getRunSamples(id, limit, offset);
+  }
+
+  async saveRun(run: RunRow, intervals: IntervalRow[] | null, samples: RunSample[] | null = null) {
+    return this.runs.saveRun(run, intervals, samples);
   }
 
   async saveWellness(row: Wellness) {
     return this.wellness.saveWellness(row);
+  }
+
+  /** Publish a fully validated import in one transaction, without holding locks during HTTP. */
+  async commitImport(staged: Store, run: SyncRun, coverage: Coverage[], signal?: AbortSignal) {
+    await this.db.transaction().execute(async (tx) => {
+      const leases = new LeaseRepository(tx);
+      const runs = new RunRepository(tx);
+      const wellness = new WellnessRepository(tx);
+      const sync = new SyncRepository(tx);
+      signal?.throwIfAborted();
+      await leases.assertLease(run.id);
+
+      for (const { id } of staged.sqlite
+        .prepare<[], { id: string }>('SELECT id FROM runs')
+        .iterate()) {
+        signal?.throwIfAborted();
+        const row = await staged.db
+          .selectFrom('runs')
+          .selectAll()
+          .where('id', '=', id)
+          .executeTakeFirstOrThrow();
+        const intervals = await staged.db
+          .selectFrom('run_intervals')
+          .selectAll()
+          .where('run_id', '=', id)
+          .orderBy('sequence')
+          .execute();
+        const samples = await staged.db
+          .selectFrom('run_samples')
+          .selectAll()
+          .where('run_id', '=', id)
+          .orderBy('sample_index')
+          .execute();
+        await runs.saveRun(row, intervals, samples);
+        if (!(await leases.renewLease(run.id))) throw new Error('LEASE_LOST');
+      }
+      for (const row of staged.sqlite.prepare<[], Wellness>('SELECT * FROM wellness').iterate()) {
+        signal?.throwIfAborted();
+        await wellness.saveWellness(row);
+      }
+      signal?.throwIfAborted();
+      await leases.assertLease(run.id);
+      for (const row of coverage) await sync.markCoverage(row);
+      await sync.updateSync(run.id, run);
+    });
   }
 
   async listWellness(range?: DateRange, limit = 50, offset = 0) {
@@ -90,10 +139,6 @@ export class Store {
 
   async coverage(range?: DateRange) {
     return this.sync.coverage(range);
-  }
-
-  async importedRanges(): Promise<DateRange[]> {
-    return this.sync.importedRanges();
   }
 
   async createSync(row: SyncRun) {
