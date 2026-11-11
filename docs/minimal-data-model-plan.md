@@ -1,6 +1,19 @@
 # Minimal running data model: implementation tracker
 
-Approved: 2026-09-27. Status: phases 1, 3, and 4 implemented; phase 2 source verification and remaining phase 5 coverage pending; deployment reset pending.
+Approved: 2026-09-27. Status: phases 1, 3, and 4 implemented; phase 2 source verification and remaining phase 5 coverage pending; local imports partially verified, production/reset verification pending.
+
+Extension approved 2026-11-10: store normalized core measurement streams and exact interval
+boundaries, with minimal power-source/corrected-stream identity. See [run-analysis-data.md](run-analysis-data.md).
+
+Import policy approved 2026-11-10: abort the entire requested batch on its first error, without
+automatic request retries. Publish measurements and coverage only after all windows/resources pass;
+otherwise retain the previous committed snapshot plus failed/interrupted history. This supersedes
+the earlier per-record/per-window partial-import policy.
+
+Import control updated 2026-11-11: use the web UI/API with explicit dates only. Each request pulls
+all approved data for those dates again. The general CLI and history-derived modes are removed;
+Compose runs a dedicated migration bootstrap. Active imports require an unexpired writer lease;
+the form's pending state cannot be held indefinitely by cached server status.
 
 This plan supersedes conflicting data-model, snapshot, backup/restore, and migration requirements
 in [implementation-plan.md](implementation-plan.md). Unrelated architecture and repository rules
@@ -21,8 +34,8 @@ remain in force. See [progress.md](progress.md) for repository state and validat
 | 2. Import and synchronization | In progress | Codex | Synthetic sync tests pass; current upstream OpenAPI field verification remains incomplete. |
 | 3. API, MCP, and web | Complete | Codex | Consumers and protocol tests use the new records. |
 | 4. Storage and operational cleanup | Complete | Codex | Snapshot/backup code removed; normalized export and disposable Compose lifecycle pass. |
-| 5. Automated validation | In progress | Codex | Local gates, Compose, and both PR CI jobs pass; remaining mapping/log-discard coverage is tracked below. |
-| 6. Data reset and manual import | Pending | Unassigned | — |
+| 5. Automated validation | In progress | Codex | Explicit-date imports and summary snapshot regressions pass local gates and 51 tests; Compose config passed in prior session. Omitted all-null stream issue set aside by user. Source/log-discard checks and full current Compose/CI checks remain. |
+| 6. Data reset and manual import | In progress | Unassigned | Local DB has migration 003 and samples for all 17 stored runs; all 146 intervals have boundaries. Historical reset procedure, completeness beyond stored runs, and production deployment are unverified. |
 
 Statuses: Pending, In progress, Blocked, Complete.
 
@@ -41,7 +54,7 @@ Statuses: Pending, In progress, Blocked, Complete.
 ## Target schema and semantics
 
 Measurements use nullable SQLite `REAL`: missing remains null and measured zero remains zero.
-Negative measurements are invalid except for `form_tsb`. Identifiers and timestamps use `TEXT`;
+Negative measurements are invalid except for `form_tsb` and sample altitudes. Identifiers and timestamps use `TEXT`;
 sequence and boolean storage use `INTEGER`.
 
 | Table | Domain fields |
@@ -49,6 +62,10 @@ sequence and boolean storage use `INTEGER`.
 | `wellness` | `date` primary key; `resting_hr_bpm`, `hrv_ms`, `sleep_duration_s`, `weight_kg`, `fitness_ctl`, `fatigue_atl`, `form_tsb`, `training_load` |
 | `runs` | `id` primary key containing the Intervals.icu activity ID; `start_time`, `indoor`, `distance_m`, `duration_s`, `moving_time_s`, `avg_speed_mps`, `max_speed_mps`, `avg_hr_bpm`, `max_hr_bpm`, `avg_power_w`, `elevation_gain_m`, `elevation_loss_m`, `avg_cadence_rpm`, `training_load` |
 | `run_intervals` | `run_id`, `sequence`, `interval_type`, `duration_s`, `distance_m`, `avg_speed_mps`, `max_speed_mps`, `avg_hr_bpm`, `max_hr_bpm`, `avg_power_w`, `max_power_w`, `elevation_gain_m`, `avg_cadence_rpm` |
+| `run_samples` | `(run_id, sample_index)` primary key; `elapsed_s`, `distance_m`, `speed_mps`, `hr_bpm`, `power_w`, `raw_power_w`, `altitude_m`, `corrected_altitude_m`, `cadence_rpm` |
+
+The extension also adds `power_source`/`samples_synced_at` to runs and nullable interval `label`,
+`start_index`, `end_index` (exclusive), `start_time_s`, `end_time_s`, and `moving_time_s`.
 
 - Interval primary key is `(run_id, sequence)`, with a cascading foreign key to `runs`.
   Sequence follows upstream array order, starting at zero.
@@ -115,13 +132,14 @@ Verification of every other retained field remains pending.
       power and interval elevation loss are now excluded; absent supported measurements remain null.
 - [x] Accept only `Run`, `TrailRun`, and `VirtualRun`; implement the wellness mapping above.
 - [x] Import ordered `icu_intervals`, including work and recovery, with nullable upstream type text.
-- [x] Map only requested statistics; do not fetch streams or invent substitute maxima, loss, or speed.
+- [x] Map requested statistics and approved core streams; do not invent substitute maxima, loss, or speed.
 - [x] Validate retained fields and discard all other payload fields before persistence or logging.
-- [x] Upsert runs by source ID and wellness by date. Replace intervals transactionally only after a
-      valid detail response. On a failed detail request, record an issue and skip the activity,
-      preserving any prior run and intervals; the window remains partial.
-- [x] Preserve manual sync modes, bounded windows, retries, leases, coverage, and partial-failure
-      behavior. A valid empty interval response clears old intervals; an unavailable response does not.
+- [x] Upsert runs by source ID and wellness by date. Stage normalized rows in disposable SQLite,
+      then publish every run/interval/sample/wellness/coverage change in one transaction. On the
+      first request, validation, or write error, abort the complete batch with zero saved records.
+- [x] Preserve manual sync modes, bounded windows, cancellation, and leases. Imports make no automatic
+      retries and produce completed/failed/interrupted outcomes; legacy partial history remains readable.
+      Valid empty responses clear prior children only when the whole batch succeeds.
 
 ### 3. API, MCP, and web
 
@@ -191,20 +209,82 @@ the wiki or unrelated applications.
 
 | 2026-11-09 | Codex / request-bound sync | Remove background manager and SSE; await imports from UI click; run check, typecheck, lint, tests, and build | All pass, including 22 tests outside sandbox; HTTP disconnect cancels import. Schema unchanged. | Review updated PR #10 and CI; stale coverage remains separate |
 
+| 2026-11-10 | Codex / run analysis extension | Add migration 003, normalized sample import, interval boundaries, local API/MCP pagination, and normalized export; run check, typecheck, lint, tests, build, diff checks | All gates pass, including 34 tests outside sandbox. Initial socket/stdio sandbox failures and a corrected test-only type error are detailed in progress.md. No athlete DB migration/write or live sync. | Review/deploy; migrate before updated services; manually re-sync explicit date ranges. Legacy stale coverage remains separate. |
+| 2026-11-10 | Codex / status verification | Read local migration names, aggregate sample coverage, and latest sync status with SQLite readonly | Migration 003 applied locally; 9 of 17 runs have samples; latest sync completed with no rejected records. Intervening import was not performed by this agent. Documentation diff check passes; no application tests repeated. | Review/commit/release; backfill remaining dates; finish source/log-discard/stale-coverage work, then wiki/agent workflow. No reset needed for stream backfill. |
+| 2026-11-10 | Codex / atomic import policy | Replace partial imports with normalized SQLite staging and one publication transaction; disable import retries; run check/typecheck/lint/tests/build/diff checks | All gates pass, including 47 tests outside sandbox. First error aborts all windows/resources; failures/cancellation preserve old data and coverage. No new migration or live import. | Review/commit/deploy updated services; finish field/log verification and power quality investigation; validate Compose/CI. |
+| 2026-11-10 | Codex / post-import review | In-memory synthetic probes for summary interleaving, expired writer leases, and sparse `all` history | Reproduced three bugs: old measurement rows with new coverage; expired running row still disables UI; `all` collapses historical gaps through bounding ranges. No runtime edits or athlete-data access. Documentation diff check passes; application gates not repeated. | Fix all three with regression tests before release. |
+| 2026-11-11 | Codex / web import control | Remove CLI imports; require a live lease for active status; derive form busy state from its mutation; run check/typecheck/lint/tests/build/diff checks | All gates pass, including 51 synthetic tests. Expired import recovery and cached-status retry work from the web; maintenance migrate/export still work. No athlete DB access or live import. | Fix remaining summary snapshot and sparse-history issues; review/commit/deploy. |
+
+| 2026-11-11 | Codex / independent sub-agent review | Review tracked/untracked changes; core tests (25 passed), DB tests (6 passed), synthetic probes, public OpenAPI schema read, diff check | Three P2 findings: missing optional all-null stream data aborts imports; known summary snapshot and sparse-history bugs persist. No implementation edits or athlete-data access. | Fix all three with regression tests before release; full gates/browser/Compose were not repeated. |
+
+| 2026-11-11 | Codex / explicit-date imports | Remove history-derived modes/general CLI; add full-reimport and deployment-bootstrap tests; check/typecheck/lint/test/build/diff and synthetic Compose config | All pass, including 49 tests. Summary fix proposed only; user set aside omitted all-null stream finding. No athlete data access or live import. | Review changes; summary implementation requires a later request; full Compose/CI checks remain. |
+
+| 2026-11-11 | Codex / summary snapshot fix | One transaction for measurement/coverage reads; two separate-connection publication regressions; check/typecheck/lint/test/build/diff | All pass, including 51 synthetic tests. Both new regressions fail against old code. No athlete data access, schema migration, live import, or deployment. | Review/commit accumulated work; complete remaining source/Compose/CI verification. |
+
+| 2026-11-11 | Codex / independent verification review | Sub-agent review of tracked/untracked changes; core/DB/web/API/MCP tests; synthetic Compose config; diff check | All 51 tests pass. Summary/expired-active fixes verified; history-derived import path removed. No new confirmed implementation defect. Corrected stale operational CLI docs; all-null parser issue excluded by user. | Review/commit accumulated work and finish source/Compose/CI checks before deployment. |
+
+| 2026-11-11 | Codex / PR publication | Commit reviewed changes as 74fa65e; push money-hedgehog; create PR #12 against main | Push and PR creation succeeded. Prior full gates and 51-test review validation stand; no merge/deployment/live import. | Review PR #12 and CI; complete outstanding source/Compose/browser verification before deployment. |
+
 For each implementation session, append commands and outcomes, including failures and checks not run.
 Do not mark a phase complete based only on code changes when its validation is still pending.
 
 ## Current handoff
 
-- Current work item: PR #10 API simplification on `refactor/simplify-api-sync` in
+- Published [PR #12](https://github.com/edge33/ai-run-coach/pull/12) from `money-hedgehog` to `main`;
+  implementation commit `74fa65e`. Next action: review PR/CI and complete source/Compose/browser
+  verification before deployment. No merge or live import performed.
+
+
+- Independent follow-up review confirms summary consistency and expired-active recovery fixes,
+  plus removal of history-derived import paths. All 51 tests independently pass; no new confirmed
+  implementation finding. Current operational docs corrected; user-set-aside stream issue remains
+  excluded. Review/commit accumulated work, then complete source/Compose/CI checks before release.
+
+
+- Explicit-date imports only: history-derived modes and the general CLI are removed. Every import
+  fetches the full approved dataset for the selected dates again. Compose uses a dedicated migration
+  bootstrap; normalized export remains in the core library. Local gates and 49 synthetic tests pass,
+  as does Compose config with a synthetic environment. No live athlete import/migration was run.
+- Summary consistency is now fixed: run/health measurement and coverage reads share one SQLite
+  transaction. Two concurrent-publication regressions fail on old code and pass after the fix;
+  full gates pass with 51 tests. No schema or response contract change and no athlete data access.
+  User-set-aside omitted all-null stream behavior remains unchanged. Next action: review/commit
+  accumulated work and complete outstanding source/Compose/CI checks before deployment.
+
+- Current follow-up: all-or-nothing import policy. Network downloads stage normalized rows in a
+  disposable SQLite database; final publication is a single transaction covering all windows and
+  resources. The first error stops the import, leaves old measurements/coverage unchanged, and
+  records failure with zero upserts. No automatic import retries; cancellation/lease loss discards
+  staging. Import history is operational metadata and does not select future import dates.
+  No schema migration is needed for this policy change. See progress.md for checks.
+  The former partial-import coverage finding is superseded by this snapshot policy; older data is
+  not made fresh by a failed attempt, so consumers must still inspect latest sync status/timestamps.
+
+- Current implementation: run-analysis sample extension on `money-hedgehog` starting at `50338e6`.
+  Migration 003 preserves existing data and adds STRICT sample storage, exact interval timing, and
+  minimal power provenance. Manual sync now publishes the entire batch atomically; failed
+  stream retrieval/validation discards all staged changes. Bounded local API/MCP reads and normalized
+  export include samples. Later read-only verification confirms migration 003 and sample imports for
+  all 17 local runs (41,323 samples); all 146 intervals have exact boundaries. Production state and
+  historical completeness beyond stored runs are unverified. Migrations remain required before
+  updating other deployments; no further stream backfill is needed for currently stored runs.
+  Validation and remaining unrelated blockers are recorded in the current progress entry.
+
+- Earlier 2026-11-10 power investigation on `money-hedgehog` (`50338e6`): public OpenAPI and
+  code tracing confirm supported run/interval power mappings. Synthetic core tests (9) and focused
+  HTTP tests (2) pass, including import-to-response power preservation. No runtime mapping change
+  was warranted. That investigation initially lacked credentials; later worktree configuration
+  enabled the requested read-only HR export. The local DB now contains separate raw/selected power
+  streams, exposing a selected-stream quality issue. Source quality still needs consideration in
+  coaching interpretation; no upstream settings changes were made by this agent.
+
+- Earlier work item: PR #10 API simplification on `refactor/simplify-api-sync` in
   `/tmp/ai-run-coach-worktrees/simplify-api-sync`. The latest user instruction supersedes the
   background-task approach: the UI icon starts a request-bound import and waits for its final
   `200` result. Removed the manager and SSE flow; storage schema is unchanged. All local gates
   pass, including 22 tests outside the sandbox; container checks were not rerun. Review the
   updated PR and CI. See `docs/progress.md` for commands, request-timeout limits, and handoff.
-- Next minimal-model correctness action (deferred during API simplification): address the second
-  adversarial review finding on stale coverage after a partial
-  detail import. Then confirm current upstream keys/units with live official documentation or a
+- Next minimal-model correctness action: confirm current upstream keys/units with live official documentation or a
   credential-backed import before marking phase 2 complete, finish remaining mapping/log-discard
   test coverage, and separately plan the data reset and historical import.
 - Field verification follow-up: public OpenAPI now confirms activity elevation loss; its mapping is

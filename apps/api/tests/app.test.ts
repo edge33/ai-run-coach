@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { addDays } from '@hub/contracts';
-import { loadConfig, mapActivity, mapWellness } from '@hub/core';
+import { beginSync, loadConfig, mapActivity, mapRunStreams, mapWellness } from '@hub/core';
 import { Store } from '@hub/db';
 import { buildApp } from '../src/app.ts';
 
@@ -51,7 +51,43 @@ test('HTTP reads are local; schemas, origins, empty states and manual sync error
     const detail = await app.inject({ url: '/api/runs/i123' });
     assert.equal(detail.statusCode, 200);
     assert.equal(detail.json().run.id, 'i123');
+    assert.equal(detail.json().run.avg_power_w, null);
     assert.equal(detail.json().intervals[0].sequence, 0);
+    assert.equal(detail.json().intervals[0].avg_power_w, null);
+    assert.equal(detail.json().intervals[0].max_power_w, null);
+    const unimported = await app.inject({ url: '/api/runs/i123/samples' });
+    assert.equal(unimported.statusCode, 200);
+    assert.equal(unimported.json().synced_at, null);
+    assert.equal(unimported.json().total, 0);
+    const samples = mapRunStreams('i123', [
+      { type: 'time', data: [0, 1, 5] },
+      { type: 'heartrate', data: [100, null, 140] },
+      { type: 'altitude', data: [-10, -9, -8] },
+      { type: 'fixed_altitude', data: [-11, -10, -9] },
+      { type: 'watts', data: [0, 200, 240] },
+      { type: 'raw_watts', data: [0, 200, 900] },
+    ]);
+    await store.saveRun({ ...mapped.run, power_source: 'power' }, mapped.intervals, samples);
+    const page = await app.inject({ url: '/api/runs/i123/samples?limit=2&offset=1' });
+    assert.equal(page.statusCode, 200);
+    assert.equal(page.json().total, 3);
+    assert.equal(page.json().power_source, 'power');
+    assert.equal(page.json().synced_at, mapped.run.synced_at);
+    assert.deepEqual(
+      page.json().items.map((s: { sample_index: number }) => s.sample_index),
+      [1, 2],
+    );
+    assert.equal(page.json().items[0].hr_bpm, null);
+    assert.equal(page.json().items[1].power_w, 240);
+    assert.equal(page.json().items[1].raw_power_w, 900);
+    assert.equal(page.json().items[1].corrected_altitude_m, -9);
+    assert.equal(
+      (await app.inject({ url: '/api/runs/i123/samples?offset=3' })).json().items.length,
+      0,
+    );
+    for (const query of ['limit=101', 'offset=-1', 'offset=200001', 'extra=1'])
+      assert.equal((await app.inject({ url: `/api/runs/i123/samples?${query}` })).statusCode, 400);
+    assert.equal((await app.inject({ url: '/api/runs/unknown/samples' })).statusCode, 404);
     const health = await app.inject({ url: '/api/health?start=2026-09-20&end=2026-09-20' });
     assert.equal(health.statusCode, 200);
     assert.equal(health.json().items[0].hrv_ms, 42);
@@ -81,6 +117,12 @@ test('HTTP reads are local; schemas, origins, empty states and manual sync error
       (await app.inject({ url: '/api/status', headers: { host: 'evil.example' } })).statusCode,
       403,
     );
+    for (const mode of ['all', 'recent']) {
+      assert.equal(
+        (await app.inject({ method: 'POST', url: '/api/sync-runs', payload: { mode } })).statusCode,
+        400,
+      );
+    }
     assert.equal(
       (await app.inject({ method: 'POST', url: '/api/sync-runs', payload: { mode: 'scheduled' } }))
         .statusCode,
@@ -91,14 +133,19 @@ test('HTTP reads are local; schemas, origins, empty states and manual sync error
         await app.inject({
           method: 'POST',
           url: '/api/sync-runs',
-          payload: { mode: 'recent', unexpected: true },
+          payload: { mode: 'range', start: '2026-09-20', end: '2026-09-20', unexpected: true },
         })
       ).statusCode,
       400,
     );
     assert.equal(
-      (await app.inject({ method: 'POST', url: '/api/sync-runs', payload: { mode: 'recent' } }))
-        .statusCode,
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/api/sync-runs',
+          payload: { mode: 'range', start: '2026-09-20', end: '2026-09-20' },
+        })
+      ).statusCode,
       503,
     );
     assert.equal(
@@ -154,13 +201,20 @@ test('UI sync waits for import completion and rejects competing imports', async 
         },
       ]);
 
+    if (url.includes('/streams.json')) return Response.json([]);
+
     if (url.includes('/activity/'))
       return Response.json({
         id: 'i123',
         type: 'Run',
         start_date_local: '2026-09-20T08:00:00',
         distance: 5000,
-        icu_intervals: [],
+        icu_average_watts: 220,
+        icu_intervals: [
+          { type: 'WORK', average_watts: 250, max_watts: 400 },
+          { type: 'RECOVERY', average_watts: 0, max_watts: 0 },
+          { type: 'WORK', average_watts: null, max_watts: null },
+        ],
       });
 
     return Response.json([{ id: '2026-09-20', hrv: 42 }]);
@@ -208,12 +262,31 @@ test('UI sync waits for import completion and rejects competing imports', async 
     assert.equal(completed.statusCode, 200);
     assert.equal(completed.json().status, 'completed');
     assert.equal((await app.inject({ url: '/api/runs/i123' })).json().run.distance_m, 5000);
+    const detail = await app.inject({ url: '/api/runs/i123' });
+    assert.equal(detail.statusCode, 200);
+    assert.equal(detail.json().run.avg_power_w, 220);
+    assert.deepEqual(
+      detail
+        .json()
+        .intervals.map((interval: { avg_power_w: number | null; max_power_w: number | null }) => [
+          interval.avg_power_w,
+          interval.max_power_w,
+        ]),
+      [
+        [250, 400],
+        [0, 0],
+        [null, null],
+      ],
+    );
+    const runs = await app.inject({ url: '/api/runs' });
+    assert.equal(runs.statusCode, 200);
+    assert.equal(runs.json().items[0].avg_power_w, 220);
     assert.equal(
       (await app.inject({ url: '/api/health?start=2026-09-20&end=2026-09-20' })).json().items[0]
         .hrv_ms,
       42,
     );
-    assert.equal(requested.length, 3);
+    assert.equal(requested.length, 4);
 
     const details = (await app.inject({ url: `/api/sync-runs/${id}` })).json();
     assert.equal(details.run.status, 'completed');
@@ -417,5 +490,101 @@ test('all stored runs and wellness are paginated without dates, capped at 50, an
     await app.close();
     await store.close();
     await rm(dir, { recursive: true });
+  }
+});
+
+test('a late upstream error returns a failed import and publishes none of the staged records', async () => {
+  const store = new Store(':memory:');
+  await store.migrate();
+  const app = buildApp(
+    store,
+    loadConfig({ INTERVALS_API_KEY: 'synthetic', APP_ORIGINS: 'http://localhost' }),
+  );
+  const originalFetch = globalThis.fetch;
+  let wellnessRequests = 0;
+  const activity = {
+    id: 'synthetic',
+    type: 'Run',
+    start_date_local: '2026-09-20T08:00:00',
+    icu_intervals: [],
+  };
+  globalThis.fetch = async (input) => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith('/activities')) return Response.json([activity]);
+    if (url.pathname.endsWith('/streams.json')) return Response.json([{ type: 'time', data: [0] }]);
+    if (url.pathname.endsWith('/wellness')) {
+      wellnessRequests++;
+      return new Response('', { status: 503 });
+    }
+    return Response.json(activity);
+  };
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/sync-runs',
+      payload: {
+        mode: 'range',
+        start: '2026-09-20',
+        end: '2026-09-20',
+      },
+    });
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.json().status, 'failed');
+    assert.equal(response.json().upserted, 0);
+    assert.equal(response.json().error_code, 'HTTP_503');
+    assert.equal(wellnessRequests, 1);
+    assert.equal((await app.inject({ url: '/api/runs' })).json().total, 0);
+    assert.equal((await app.inject({ url: '/api/health' })).json().total, 0);
+    assert.deepEqual(await store.coverage(), []);
+    assert.equal(await store.activeSync(), null);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await app.close();
+    await store.close();
+  }
+});
+
+test('expired imports are not active and a new web import recovers abandoned history without upstream reads', async () => {
+  const store = new Store(':memory:');
+  await store.migrate();
+  const config = loadConfig({ INTERVALS_API_KEY: 'synthetic', APP_ORIGINS: 'http://localhost' });
+  const app = buildApp(store, config);
+  const originalFetch = globalThis.fetch;
+  let upstreamCalls = 0;
+  globalThis.fetch = async () => {
+    upstreamCalls++;
+    return Response.json([]);
+  };
+  try {
+    const old = await beginSync(
+      store,
+      { mode: 'range', start: '2026-09-20', end: '2026-09-20' },
+      config.timezone,
+    );
+    assert.equal((await app.inject({ url: '/api/status' })).json().active.id, old.id);
+    store.sqlite.prepare('UPDATE leases SET expires_at = 0').run();
+    const status = await app.inject({ url: '/api/status' });
+    assert.equal(status.statusCode, 200);
+    assert.equal(status.json().active, null);
+    assert.equal(upstreamCalls, 0);
+    assert.equal((await store.syncRun(old.id))?.status, 'running');
+    const next = await app.inject({
+      method: 'POST',
+      url: '/api/sync-runs',
+      payload: {
+        mode: 'range',
+        start: '2026-09-20',
+        end: '2026-09-20',
+      },
+    });
+    assert.equal(next.statusCode, 200);
+    assert.equal(next.json().status, 'completed');
+    assert.equal((await store.syncRun(old.id))?.status, 'interrupted');
+    assert.equal(upstreamCalls, 2);
+    assert.equal((await app.inject({ url: '/api/status' })).json().active, null);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await app.close();
+    await store.close();
   }
 });

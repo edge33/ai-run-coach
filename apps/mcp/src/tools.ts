@@ -4,6 +4,7 @@ import {
   metricSchema,
   pageSchema,
   rangeSchema,
+  sampleQuerySchema,
   validateRange,
   wikiPageSchema,
 } from '@hub/contracts';
@@ -83,6 +84,12 @@ export function createMcpServer(store: Store, config: Config) {
       interval_offset: z.number().int().min(0).max(10000).default(0),
     },
     async (q) => store.getRun(q.id, q.interval_offset),
+  );
+  tool(
+    'get_run_samples',
+    'Read up to 100 aligned run samples in index order. Units are in field names; cadence is rpm, end_index on intervals is exclusive. Null synced_at means streams have not been imported. No upstream request.',
+    { id: z.string().min(1).max(200), ...sampleQuerySchema.shape },
+    async (q) => store.getRunSamples(q.id, q.limit, q.offset),
   );
   tool(
     'get_health_data',

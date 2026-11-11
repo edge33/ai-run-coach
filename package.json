@@ -20,9 +20,6 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "migrate": "node --env-file-if-exists=.env apps/api/src/cli.ts migrate",
-    "sync": "node --env-file-if-exists=.env apps/api/src/cli.ts sync",
-    "export": "node --env-file-if-exists=.env apps/api/src/cli.ts export",
     "mcp": "node --env-file-if-exists=.env apps/mcp/src/stdio.ts"
   },
   "devDependencies": {

@@ -25,7 +25,8 @@ export function App() {
   } catch {
     rangeError = `Choose a valid start and end date covering 1–${MAX_SYNC_DAYS} days.`;
   }
-  const busy = sync.pending || !!status.data?.active;
+  // Cached server status must not lock the form after another request ends or its writer crashes.
+  const busy = sync.pending;
 
   return (
     <main>

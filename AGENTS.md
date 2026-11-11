@@ -33,8 +33,8 @@ resume without conversation history.
   `pnpm run lint`, `pnpm test`, and `pnpm run build`; Compose validation commands are in
   `docs/progress.md`. Use only disposable synthetic data for validation.
 - Update the minimal-model tracker when its checklist, blockers, or next action changes.
-- Distinguish implementation completion from deployment reset and historical import. Never infer
-  a historical import range from `all` on an empty database.
+- Distinguish implementation completion from deployment reset and historical import. Imports require
+  explicit dates; never infer a historical import range from database contents.
 - Before handing off, report the branch, commit, uncommitted files, validation outcomes, and next
   action. A fresh clone does not include uncommitted work or ignored local configuration/data.
 - Keep local credentials, athlete wiki, and personal MCP configuration out of handoff commits.

@@ -273,3 +273,77 @@ it('validates sync dates while keeping all-record lists independent of the selec
   });
   client.clear();
 });
+
+it('cached active status cannot disable Sync; the server rejects concurrency and permits a later retry', async () => {
+  const active = {
+    id: 'other-import',
+    mode: 'range',
+    start: '2026-11-09',
+    end: '2026-11-09',
+    ranges_json: '[]',
+    status: 'running',
+    started_at: '2026-11-09T10:00:00Z',
+    completed_at: null,
+    received: 0,
+    upserted: 0,
+    rejected: 0,
+    requests: 0,
+    completed_windows: 0,
+    total_windows: 2,
+    error_code: null,
+  };
+  let posts = 0;
+  const fetch = vi.fn(async (input: string, options?: RequestInit) => {
+    if (options?.method === 'POST') {
+      posts++;
+      if (posts === 1) return Response.json({ error: 'SYNC_BUSY', active }, { status: 409 });
+      return Response.json({
+        ...active,
+        id: 'new-import',
+        status: 'completed',
+        completed_at: '2026-11-09T10:00:01Z',
+        completed_windows: 2,
+      });
+    }
+    if (input === '/api/status')
+      return Response.json({
+        timezone: 'Europe/Rome',
+        today: '2026-11-09',
+        coverage: [],
+        latest: active,
+        active,
+        run_count: 0,
+        health_days: 0,
+      });
+    return Response.json({ items: [], total: 0 });
+  });
+  vi.stubGlobal('fetch', fetch);
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchInterval: false,
+      },
+      mutations: { retry: false },
+    },
+  });
+  render(
+    <QueryClientProvider client={client}>
+      <App />
+    </QueryClientProvider>,
+  );
+  await screen.findByText('No runs yet');
+  expect(posts).toBe(0);
+  const button = screen.getByRole('button', { name: 'Sync' }) as HTMLButtonElement;
+  await waitFor(() => expect(button.disabled).toBe(false));
+  fireEvent.click(button);
+  await screen.findByText('A synchronization is already running.');
+  await waitFor(() => expect(button.disabled).toBe(false));
+  fireEvent.click(button);
+  await screen.findByText('Sync completed: 0 records saved, 0 unavailable.');
+  await waitFor(() => expect(button.disabled).toBe(false));
+  expect(posts).toBe(2);
+  client.clear();
+});

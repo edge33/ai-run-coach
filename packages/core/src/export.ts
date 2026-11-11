@@ -9,6 +9,7 @@ export async function exportData(store: Store, destination: string) {
   const records = await store.db.transaction().execute(async (tx) => ({
     runs: await tx.selectFrom('runs').selectAll().execute(),
     intervals: await tx.selectFrom('run_intervals').selectAll().execute(),
+    samples: await tx.selectFrom('run_samples').selectAll().execute(),
     wellness: await tx.selectFrom('wellness').selectAll().execute(),
     sync_runs: await tx.selectFrom('sync_runs').selectAll().execute(),
     coverage: await tx.selectFrom('coverage').selectAll().execute(),
