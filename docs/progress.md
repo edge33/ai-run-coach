@@ -31,6 +31,10 @@ Validated on Node 26.13.0 and pnpm 12.18.0:
   blocked when registry.npmjs.org stopped resolving during dependency installation. Startup,
   proxy smoke checks, and Nginx validation are not claimed as passed. Native build prerequisites
   were removed from the final Dockerfile because no native database package remains.
+- Cleanup implementation committed as `d610933`. Both `git push -u origin chore/remove-legacy-data`
+  and `gh pr create --base main --head chore/remove-legacy-data --body-file ...` were attempted
+  and failed due to DNS; no remote branch or PR was created. PR description is prepared locally
+  in `/tmp/ai-run-coach-cleanup-pr.md`.
 - GitHub publication is currently blocked by the same DNS failure: `gh api user` cannot connect
   to api.github.com and `git ls-remote origin HEAD` cannot resolve github.com. The `gh auth status`
   failure during this outage does not establish an invalid credential. Retry when DNS recovers.
