@@ -1,67 +1,13 @@
 # Code map
 
-The workspace boundaries and domain rules are described in [implementation-plan.md](implementation-plan.md).
-This guide locates the implementation within those boundaries.
+- `apps/api/src/app.ts`: health and unavailable-data status routes, host/origin validation.
+- `apps/mcp/src/tools.ts`: the five athlete-wiki tools and bounded responses.
+- `apps/mcp/src/app.ts`, `http.ts`, `stdio.ts`: MCP transports and startup.
+- `apps/web/src/App.tsx`: the unavailable-measurements screen.
+- `packages/core/src/wiki.ts`: Markdown facts, provenance, revisions, confirmation and locking.
+- `packages/core/src/config.ts`: wiki paths, origins, hosts and logging.
+- `packages/contracts/src/index.ts`: shared wiki validation.
+- `packages/config`: shared TypeScript settings.
+- `compose.yaml`, `Dockerfile`, `deploy/nginx.conf`: application shell deployment.
 
-## Database (`packages/db/src`)
-
-- `index.ts` preserves the package's public exports.
-- `store.ts` owns the SQLite connection, readiness checks, and cross-table counts. Its public methods
-  delegate to repositories sharing the same Kysely connection.
-  `commitImport` publishes a disposable staging Store's normalized records, coverage, and completed
-  sync state in one transaction after downloads finish; repository writes reuse that transaction.
-- `schema.ts` defines persisted row types; `migrations.ts` registers immutable modules under
-  `migrations/`. Migration 002 removes unsupported run maximum power and interval elevation loss.
-  Migration 003 adds aligned samples and interval boundaries without resetting records.
-- `runs.ts` writes runs, intervals, and samples transactionally and provides bounded sample reads.
-- `health.ts` reads and upserts daily wellness rows.
-- `leases.ts` manages the atomic writer lease.
-- `sync.ts` stores sync history, recovery state, issues, and coverage.
-- `ranges.ts` merges imported date ranges without accessing the database.
-
-Keep repository queries near their related writes. Callers continue to use `Store`; repositories do
-not create connections or import the Store facade.
-
-## HTTP API (`apps/api/src`)
-
-`app.ts` composes the server: logging, request restrictions, error handling, health/status endpoints,
-route registration, and shutdown. Files under `routes/` register run, health, summary, and manual-sync
-endpoints. `routes/schemas.ts` contains shared HTTP schema adapters and response envelopes.
-
-`routes/sync.ts` awaits the importer directly inside `POST /api/sync-runs` and returns the final
-sync record. Request disconnection and application shutdown cancel upstream requests and retry waits.
-There is no sync manager, background job, or SSE endpoint. The SQLite writer lease excludes competing
-imports from concurrent browser requests. Route modules receive dependencies explicitly under the
-`/api` prefix. `scripts/migrate.ts` is a dedicated deployment bootstrap, run locally with
-`pnpm run migrate` and directly by Compose; there is no general CLI.
-Imports accept explicit dates only and fetch the full approved dataset for those dates.
-
-## Core (`packages/core/src`)
-
-`sync.ts` coordinates the manual ingestion workflow and its lease, counters, and failure handling.
-Imports stop at the first error, discard the whole staged batch, and retain the previous committed
-snapshot. Network requests never hold the live database's publication transaction open.
-`intervals.ts` handles bounded, cancellable upstream GET requests, while `mapping.ts` validates and
-normalizes source records. `streams.ts` validates and aligns the approved measurement streams;
-see [run-analysis-data.md](run-analysis-data.md) for source mappings and API/MCP pagination.
-Other domain modules cover summaries, wiki operations, configuration,
-and normalized export. Source payloads, snapshots, and backups are not retained.
-
-## Web (`apps/web/src`)
-
-`App.tsx` renders the single page, start/end dates, range-sync button, validation, and sync feedback.
-The latest 15 local dates are selected for sync by default, with a 90-day maximum. `Runs.tsx` and
-`Health.tsx` always render all stored records, newest first, with independent 50-entry pages.
-Their query keys contain only offsets; sync dates do not filter or reset the lists.
-`api.ts` provides validated local API reads and `useSync`: click, await the result, refresh local
-queries. `components.tsx` contains empty/error notices and bounded pagination. There are no
-navigation routes, charts, summary cards, or detail screens.
-The form's busy state follows the pending mutation, not cached server status. Expired writer leases
-do not count as active imports; a new web request can acquire the lease and interrupt abandoned history.
-
-## Reviewing changes
-
-Start with the relevant route or screen, then follow its Store or core call. For persistence changes,
-review transaction boundaries and the schema together. Existing tests in each workspace exercise the
-public interfaces, so internal module moves retain the same regression checks. Run the root scripts
-`pnpm run check`, `pnpm run typecheck`, `pnpm run lint`, `pnpm test`, and `pnpm run build` after a refactor.
+There is no data provider, application database, migration system, or synchronization pipeline.

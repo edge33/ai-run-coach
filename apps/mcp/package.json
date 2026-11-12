@@ -13,7 +13,6 @@
   "dependencies": {
     "@hub/contracts": "workspace:*",
     "@hub/core": "workspace:*",
-    "@hub/db": "workspace:*",
     "fastify": "5.12.5",
     "zod": "4.6.5",
     "@modelcontextprotocol/sdk": "1.30.0"
