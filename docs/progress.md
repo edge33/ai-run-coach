@@ -31,18 +31,17 @@ Validated on Node 26.13.0 and pnpm 12.18.0:
   blocked when registry.npmjs.org stopped resolving during dependency installation. Startup,
   proxy smoke checks, and Nginx validation are not claimed as passed. Native build prerequisites
   were removed from the final Dockerfile because no native database package remains.
-- Cleanup implementation committed as `d610933`. Both `git push -u origin chore/remove-legacy-data`
-  and `gh pr create --base main --head chore/remove-legacy-data --body-file ...` were attempted
-  and failed due to DNS; no remote branch or PR was created. PR description is prepared locally
-  in `/tmp/ai-run-coach-cleanup-pr.md`.
-- GitHub publication is currently blocked by the same DNS failure: `gh api user` cannot connect
-  to api.github.com and `git ls-remote origin HEAD` cannot resolve github.com. The `gh auth status`
-  failure during this outage does not establish an invalid credential. Retry when DNS recovers.
+- Cleanup implementation committed as `d610933`. Initial publication attempts failed due to DNS.
+  On the user's retry, `git push -u origin chore/remove-legacy-data` and `gh pr create` succeeded.
+  [PR #14](https://github.com/edge33/ai-run-coach/pull/14) is open against `main`.
+  Publication includes only the cleanup branch; the Garmin checkpoint remains local.
+- Local application validation above was not repeated for this publication-only retry.
+  Hosted CI runs on the PR. No merge or deployment was performed.
 
 ## Next action
 
-Publish the committed cleanup branch and open its PR once DNS recovers; let the user merge it. Reapply the preserved Garmin
-work on the merged fresh base in a separate change; do not publish it with this cleanup.
+Review PR #14 and its hosted CI; the user will merge it. Reapply the preserved Garmin work
+on the merged fresh base in a separate change; do not publish it with this cleanup.
 
 ## Validation commands
 
