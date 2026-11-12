@@ -1,10 +1,9 @@
 import { type Config, isAllowedRequest, logger } from '@hub/core';
-import type { Store } from '@hub/db';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import Fastify, { LogController } from 'fastify';
 import { createMcpServer } from './tools.ts';
 
-export function buildMcpApp(store: Store, config: Config) {
+export function buildMcpApp(config: Config) {
   const app = Fastify({
     loggerInstance: logger,
     logController: new LogController({ disableRequestLogging: true }),
@@ -16,11 +15,10 @@ export function buildMcpApp(store: Store, config: Config) {
       return reply.code(403).send({ error: 'ORIGIN_NOT_ALLOWED' });
   });
   app.get('/healthz', async () => {
-    await store.assertReady();
     return { status: 'ok' };
   });
   app.post('/mcp', async (request, reply) => {
-    const server = createMcpServer(store, config);
+    const server = createMcpServer(config);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,

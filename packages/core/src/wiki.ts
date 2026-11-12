@@ -1,11 +1,14 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { type FactInput, factInputSchema, pages, wikiPageSchema } from '@hub/contracts';
 import lockfile from 'proper-lockfile';
 import YAML from 'yaml';
 import { z } from 'zod';
-import { hash } from './mapping.ts';
+
+function hash(value: unknown) {
+  return createHash('sha256').update(JSON.stringify(value)).digest('hex');
+}
 
 const factSchema = z
   .object({

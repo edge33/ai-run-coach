@@ -11,9 +11,7 @@
     "test": "node --test --test-isolation=none \"tests/*.test.ts\""
   },
   "dependencies": {
-    "@hub/contracts": "workspace:*",
     "@hub/core": "workspace:*",
-    "@hub/db": "workspace:*",
     "fastify": "5.12.5",
     "zod": "4.6.5"
   }
