@@ -14,7 +14,7 @@ and deployment status; [measurement semantics](run-analysis-data.md) define stor
 - `packages/db`: Kysely repositories over `better-sqlite3`, schema initialization, leases and coverage.
 
 Use the pinned Node/pnpm versions, existing workspaces and Biome. SQLite uses foreign keys, WAL,
-STRICT measurement tables and a busy timeout. Credentials, databases, private probe reports and
+STRICT measurement tables and a busy timeout. Credentials, databases and
 athlete wiki content stay out of Git and Docker image layers.
 
 ## Source and synchronization
@@ -42,15 +42,12 @@ across manual imports in one API instance.
 Exchange the server-side Garmin key for a short-lived access token during the import only.
 
 Every JSON request requires a named Zod response contract in `garmin/schemas.ts`: token,
-activity search, activity detail, daily summary, sleep/HRV range responses and weight (plus
-single-day sleep/HRV and workouts in the
-separate development probe). Required envelope/core fields must be present, even when a
-measurement is explicitly null. Range sleep/HRV measurements require valid source dates, reject
+activity search, activity detail, daily summary, sleep/HRV range responses and weight. Required
+envelope/core fields must be present, even when a measurement is explicitly null. Range sleep/HRV measurements require valid source dates, reject
 duplicates and out-of-range dates, and join by date rather than array position. Empty undated sleep
 rows (zero/null sleep duration) are ignored without assigning dates; undated positive sleep remains
 an error, and dated zero readings are preserved. Missing dates yield null
-measurements; no neighboring-day values are carried forward. Single-day sleep dates remain optional
-in the development probe, where the request identifies the day; range imports never invent dates. Changed field types, renamed required fields and invalid dates
+measurements; no neighboring-day values are carried forward. Range imports never invent dates. Changed field types, renamed required fields and invalid dates
 raise `GARMIN_CONTRACT_CHANGED`. Optional device-dependent readings may be omitted. Additional
 upstream fields are ignored and stripped; this validates the consumed contract rather than
 claiming to detect every possible Garmin API change. Missing optional values cannot be
@@ -122,12 +119,13 @@ API/MCP startup checks schema readiness and never initializes or imports implici
 Compose runs the one-shot `initialize` service before API/MCP. Only Nginx publishes
 `${BIND_IP:-127.0.0.1}:8080`, serving the web app and proxying `/api` and `/mcp`. Configure
 `APP_ORIGINS` to the externally used origin. API receives `GARMIN_API_KEY`; MCP needs no upstream key.
-Database and wiki use separate volumes. Keep existing host/origin validation and response limits.
+Database and wiki share the host bind mount `${DATA_PATH:-./data}:/app/data`. The root `compose.yaml`
+is the source-build setup. See [storage setup](storage.md) for image mounts and existing-data moves.
+Keep existing host/origin validation and response limits.
 
 For native operation: configure ignored `.env`, run `pnpm run db:init`, then `pnpm run dev`.
 The normalized `exportData` core function emits source/mapping metadata and measured records.
-There is no general import/export CLI or backup system. The standalone Garmin explorer is a
-separate development aid and writes only ignored private reports.
+There is no general import/export CLI, development explorer or backup system.
 
 ## Import logging
 

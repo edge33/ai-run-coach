@@ -18,6 +18,12 @@ jobs:
       - run: pnpm run lint
       - run: pnpm test
       - run: pnpm run build
+      - name: Prepare bind-mounted data directory
+        env:
+          DATA_PATH: ${{ runner.temp }}/running-data-hub-validation-data
+        run: |
+          echo "DATA_PATH=$DATA_PATH" >> "$GITHUB_ENV"
+          sudo install -d -m 0755 -o 1000 -g 1000 "$DATA_PATH"
       - run: docker compose config --quiet
       - run: docker compose up --build -d --wait
         env:

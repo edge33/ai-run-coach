@@ -10,7 +10,6 @@
 - `packages/core/src/garmin/schemas.ts`: named upstream response contracts and sanitized validation.
 - `packages/core/src/garmin/errors.ts`: upstream request and contract errors.
 - `packages/core/src/garmin/api.ts`: JSON pagination and measurement normalization.
-- `packages/core/src/garmin/explore.ts`: development-only private source investigation.
 - `packages/core/src/garmin/fit.ts`: bounded FIT/ZIP decoding, units and source timing warnings.
 - `packages/core/src/garmin/import.ts`: measured-record mapping and dated bulk wellness joins.
 - `packages/core/src/garmin/request-gate.ts`: cancellable pacing and API-instance cooldown.
@@ -21,4 +20,3 @@
 - `apps/mcp/src/tools.ts`: shared semantic tool registry; no upstream access or sync tool.
 - `apps/web/src`: manual date selection and independently paginated local lists.
 - `scripts/initialize.ts`: explicit schema bootstrap.
-- `scripts/explore-garmin.ts`: standalone private extraction report, no SQLite writes.

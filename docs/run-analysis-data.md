@@ -1,8 +1,8 @@
 # Garmin measurements and timing
 
 API JSON supplies run totals and wellness. Original activity FIT files supply recorded laps,
-workout-classified splits and samples. See [exploration findings](garmin-exploration.md) for source
-mapping evidence and [implementation plan](implementation-plan.md) for import/storage behavior.
+workout-classified splits and samples. See the [implementation plan](implementation-plan.md)
+for import/storage behavior.
 
 ## Records
 

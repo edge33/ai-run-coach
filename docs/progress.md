@@ -2,6 +2,113 @@
 
 Last updated: 2026-11-13
 
+## CI bind-mount startup fix (current)
+
+- PR #16 CI run `43449414709` failed during `docker compose up --build -d --wait`:
+  initializer logged `EACCES: permission denied, mkdir '/app/data/db'`. The missing host bind
+  directory was created by Docker as root, hiding image-layer ownership. Initial bind config
+  validation did not exercise this fresh-checkout startup requirement.
+- CI now sets `DATA_PATH=${{ runner.temp }}/running-data-hub-validation-data` in the setup
+  step, exports it through `GITHUB_ENV` for later steps, and prepares it
+  before Compose with `sudo install -d -m 0755 -o 1000 -g 1000 "$DATA_PATH"`. All Compose steps
+  share this path. Storage docs explain host ownership and the root-created-directory failure.
+  Application logic, image runtime identity and user data are unchanged.
+- Local disposable full-stack validation passes with
+  `DATA_PATH=/tmp/ai-run-coach-bind-ci.oaLZYM APP_ORIGINS=http://127.0.0.1:8080
+  BIND_IP=127.0.0.1 GARMIN_API_KEY='' DOCKER_BUILDKIT=0 docker compose --env-file /dev/null
+  -p running-data-hub-bind-ci-validation up --build -d --wait`. Directory prepared as UID/GID
+  1000:1000; classic builder used because local Buildx is unavailable. Initializer exits 0;
+  API, MCP and Nginx all healthy. `exec nginx nginx -t` passes, and proxy `/api/status` confirms
+  zero runs/health dates, empty coverage and no history. An initial ad hoc status assertion used
+  nonexistent `source_configured`; corrected to actual status fields, with no application change.
+- `pnpm run check` (75 files) and `git diff --check` pass. No new tests for CI/deployment wiring
+  per repository rules; prior 79 application tests still apply. Removed disposable containers,
+  network and bind directory after verification. No real data/imports involved.
+- First fix push `0b14b9f` had no jobs: `runner.temp` was placed in job-level env, where the
+  runner context is unavailable. Moved it to step env and persisted the path via `GITHUB_ENV`.
+- Fix commit `2beeab2` passes GitHub PR workflow `43450559239`, including every application
+  gate, bind directory preparation, `docker compose up --build -d --wait`, `nginx -t` and
+  cleanup. Final documentation records this verified result.
+- Worktree `/home/edge33/dev/ai-run-coach`, branch `chore/data-directory-cleanup`. Next:
+  review/merge PR #16 before single-container work. No remaining startup blocker.
+
+## Cleanup and storage PR handoff (current)
+
+- User authorized committing/pushing `chore/data-directory-cleanup` and opening a PR against
+  `main`. Refetched `origin/main`; it remains `2ad68a3`, the branch base. Scope is temporary
+  Garmin exploration removal, persistent database/wiki paths under `data/`, Compose host bind
+  mounts and storage documentation. Single-container packaging is deferred to a new change
+  from fresh main after this work is merged; no process supervision/startup change is included.
+- Prior full validation remains applicable: 79 uncached synthetic tests, typecheck, lint, build,
+  runtime image build and disposable database/wiki persistence smoke passed. Bind-mount follow-up
+  passed default/override Compose config inspection. Final `pnpm run check` and `git diff --check`
+  pass. Reviewed candidate diff; ignored credentials, database, wiki and personal configuration
+  remain excluded. Local test measurements/history were separately cleared with user authorization.
+- Worktree `/home/edge33/dev/ai-run-coach`. Publication includes the cleanup/storage source,
+  tests and documentation only. No image publication, deployment, merge or Garmin import is
+  authorized by this PR handoff. Next: review/merge the PR, then branch from updated main for
+  single-container packaging. Existing deployment data needs moving before changing mounts.
+
+## Compose host bind mounts (current)
+
+- User requested bind mounts. `compose.yaml` now mounts `${DATA_PATH:-./data}:/app/data`
+  for initializer, API and MCP and declares no named volumes. The default host path is the
+  repository's `data/`; `.env.example` documents `DATA_PATH` for an absolute host override.
+  Updated storage instructions, architecture and Garmin tracker. Host directories must be
+  writable by the runtime UID/GID 1000:1000; setup commands are in `docs/storage.md`.
+- Validation: synthetic `docker compose --env-file /dev/null config --quiet` passes. Parsed
+  `config --format json` with empty credentials and explicit synthetic origins verifies all
+  three mounts are type `bind`, target `/app/data`, source the repository's `data/` by default,
+  and source `/tmp/running-data-hub-bind-validation` when `DATA_PATH` is overridden. There are
+  no top-level named volumes. No containers started or real directories/ownership changed.
+  `pnpm run check` (75 files) and `git diff --check` pass. No application code changed in this
+  follow-up, so application tests/build and the earlier image smoke were not repeated.
+- Worktree `/home/edge33/dev/ai-run-coach`, branch `chore/data-directory-cleanup`, HEAD
+  `2ad68a3`. All accumulated cleanup/storage changes remain uncommitted; no push or merge.
+  Next: review/commit the diff, prepare the chosen host directory and move existing deployment
+  data into it before starting the updated Compose stack. Local database remains empty.
+
+## Data directory consolidation and Garmin exploration cleanup (current)
+
+- Fetched `origin/main` and created `chore/data-directory-cleanup` at `2ad68a3` in
+  `/home/edge33/dev/ai-run-coach`. Initial worktree was clean. Changes remain uncommitted;
+  no push, merge, real Garmin call or historical import was performed. The user subsequently
+  authorized clearing all local imported measurements and sync history (completed below).
+- Removed temporary `scripts/explore-garmin.ts`, core explorer, exploration report guide,
+  explorer-only test and workout response schema/case. Production mapping and API/MCP/core/DB
+  regression tests remain. No ignored probe reports or diagnostic scripts were present locally.
+- Default database remains `data/db/coach.sqlite`; wiki now defaults to `data/athlete_wiki`.
+  Runtime image sets both absolute paths under `/app/data`, creates writable directories for
+  the node user. Compose now bind-mounts `${DATA_PATH:-./data}:/app/data` across
+  initializer/API/MCP, superseding the initially validated named-volume configuration.
+  Added `docs/storage.md` covering bind ownership, initialization and moves from old volumes.
+  Old Compose volumes are not copied automatically. `compose.yaml` is the latest-main filename.
+- Updated the ignored local `.env` wiki setting from `athlete_wiki` to `data/athlete_wiki`;
+  no old local wiki directory existed to move. Credentials are unchanged and remain ignored.
+  User explicitly authorized clearing all local imported measurements and sync history. Before
+  clearing, outside-sandbox `fuser` found no database/WAL/SHM users and `docker ps` showed no
+  running containers. A one-off native Node operation against the configured
+  `data/db/coach.sqlite` used `secure_delete=ON` and an immediate transaction to clear runs,
+  laps, splits, samples, wellness, coverage, sync issues/history and leases, then checkpointed,
+  vacuumed and truncated WAL. All nine tables verify zero rows; `integrity_check` returns `ok`
+  and `foreign_key_check` returns no violations. Schema remains initialized; no backup was made.
+  Credentials and wiki content were not modified by this reset. No Garmin request was made.
+- Node `26.13.0`, pnpm `12.18.0`: `pnpm install --frozen-lockfile`, `pnpm run check`
+  (75 files), `pnpm run typecheck`, `pnpm run lint`, `pnpm run build` pass. Install required
+  outside-sandbox pnpm store access. Initial test run was blocked by sandbox loopback EPERM;
+  outside-sandbox `pnpm exec turbo run test --force` passes all 79 synthetic tests (core 61,
+  API 10, MCP 3, DB 5). Typecheck/lint/build reuse unchanged-workspace Turbo results.
+- `BIND_IP=127.0.0.1 APP_ORIGINS=http://127.0.0.1:8080 GARMIN_API_KEY='' docker compose
+  --env-file /dev/null config --quiet` passes. `docker build --target runtime -t
+  running-data-hub:data-cleanup-validation .` passes. With network disabled and the disposable
+  volume `running-data-hub-data-cleanup-validation` mounted only at `/app/data`, initialization,
+  schema-readiness, synthetic wiki write and wiki read in a replacement container pass. Removed
+  that validation volume and image tag afterwards. No real containers or volumes were changed.
+- `git diff --check` passes. Next: review the uncommitted cleanup/storage diff and move any
+  existing deployment data before switching mounts. Local database is initialized and empty;
+  any new UI import still requires an explicitly chosen date range.
+  A fresh clone does not contain these uncommitted changes or ignored local configuration/data.
+
 ## Garmin PR handoff (current)
 
 - User authorized committing/pushing the accumulated Garmin implementation and opening a PR

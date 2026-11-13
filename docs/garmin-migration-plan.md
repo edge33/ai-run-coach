@@ -25,7 +25,6 @@ multi-provider integration is required.
   the user explicitly accepts its minimum-HR fallback. No per-day requests to fill missing values.
 - Pace request starts with GARMIN_REQUEST_INTERVAL_MS (default 1000 ms). Honor server Retry-After
   in the current API instance, expose its deadline to the UI, and reject early manual retries.
-- Single-day exploratory sleep responses may omit calendarDate; validate any provided date.
 - Named upstream schemas reject breaking changes to consumed fields with `GARMIN_CONTRACT_CHANGED`.
   Preserve history and prior data on failure; ignore unused additive fields.
 - SQLite only; manual read-only imports with explicit dates, max 90 inclusive days, 31-day resource
@@ -64,12 +63,13 @@ warnings as described in [measurement semantics](run-analysis-data.md).
 
 ## Next action
 
-Review and merge the Garmin implementation PR, then continue explicit-date UI verification,
-respecting server cooldown. Bulk daily summaries (including the accepted minimum-HR fallback),
-sleep/HRV, pacing, cooldown and empty undated sleep handling pass synthetic checks.
-Read-only history inspection now confirms a successful UI import after the earlier atomic failures.
-Missing HRV on the investigated date matches null lastNightAvg from both Garmin endpoints;
-weekly HRV and detailed readings exist separately. Compare the exact website metric before
-changing measurement semantics. Current proxy timeout is accepted; additional weight-range
-validation is deferred as defensive hardening. See [implementation plan](implementation-plan.md),
-[progress](progress.md), and [exploration findings](garmin-exploration.md).
+Review PR #16 storage consolidation and temporary explorer removal. CI now prepares the bind
+directory with runtime UID/GID ownership; local full-stack startup verification passes. Database and wiki now share
+`data/` (Compose bind-mounts `${DATA_PATH:-./data}` at `/app/data`); see [storage setup](storage.md) before moving an
+existing installation. The temporary Garmin explorer, its report guide and explorer-only test
+and workout schema have been removed; production measurement mapping and regression tests remain.
+
+Continue explicit-date UI verification after deployment, respecting server cooldown. Historical
+imports still require explicit dates. No deployment reset or historical import is implied by
+implementation completion. The separately authorized local measurement/history reset is complete;
+the initialized local database is empty. See [progress](progress.md) for validation and cleanup details.
