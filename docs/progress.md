@@ -8,7 +8,8 @@ Last updated: 2026-11-13
   initializer logged `EACCES: permission denied, mkdir '/app/data/db'`. The missing host bind
   directory was created by Docker as root, hiding image-layer ownership. Initial bind config
   validation did not exercise this fresh-checkout startup requirement.
-- CI now sets `DATA_PATH=${{ runner.temp }}/running-data-hub-validation-data` and prepares it
+- CI now sets `DATA_PATH=${{ runner.temp }}/running-data-hub-validation-data` in the setup
+  step, exports it through `GITHUB_ENV` for later steps, and prepares it
   before Compose with `sudo install -d -m 0755 -o 1000 -g 1000 "$DATA_PATH"`. All Compose steps
   share this path. Storage docs explain host ownership and the root-created-directory failure.
   Application logic, image runtime identity and user data are unchanged.
@@ -23,8 +24,10 @@ Last updated: 2026-11-13
 - `pnpm run check` (75 files) and `git diff --check` pass. No new tests for CI/deployment wiring
   per repository rules; prior 79 application tests still apply. Removed disposable containers,
   network and bind directory after verification. No real data/imports involved.
-- Worktree `/home/edge33/dev/ai-run-coach`, branch `chore/data-directory-cleanup`. Next: push
-  this fix to existing PR #16, verify GitHub CI, and review/merge before single-container work.
+- First fix push `0b14b9f` had no jobs: `runner.temp` was placed in job-level env, where the
+  runner context is unavailable. Moved it to step env and persisted the path via `GITHUB_ENV`.
+- Worktree `/home/edge33/dev/ai-run-coach`, branch `chore/data-directory-cleanup`. Next: verify
+  GitHub CI on existing PR #16 and review/merge before single-container work.
 
 ## Cleanup and storage PR handoff (current)
 
