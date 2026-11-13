@@ -15,9 +15,82 @@ main {
   margin: 0 auto;
   padding: 24px 16px;
 }
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
 h1 {
   font-size: 24px;
 }
+h2 {
+  font-size: 20px;
+}
+h3 {
+  font-size: 16px;
+}
+section {
+  margin-top: 32px;
+}
 p {
   margin: 8px 0;
+}
+button {
+  font: inherit;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+button:disabled {
+  cursor: default;
+}
+:focus-visible {
+  outline: 2px solid #222;
+  outline-offset: 3px;
+}
+ul {
+  list-style: none;
+  padding: 0;
+}
+li {
+  padding: 12px 0;
+  border-bottom: 1px solid #ddd;
+}
+li p {
+  margin-bottom: 0;
+}
+.error {
+  color: #a11;
+}
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+.pagination button + button {
+  margin-left: 8px;
+}
+
+fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  border: 0;
+  padding: 0;
+  margin: 16px 0;
+}
+legend {
+  padding: 0;
+  margin-bottom: 8px;
+}
+label {
+  display: grid;
+  gap: 4px;
+}
+input {
+  font: inherit;
+  padding: 6px;
 }

@@ -2,6 +2,7 @@ FROM node:26.13.0-bookworm-slim AS base
 COPY --from=ghcr.io/pnpm/pnpm:12.18.0 /opt/pnpm /opt/pnpm
 RUN ln -s /opt/pnpm/pnpm /usr/local/bin/pnpm
 WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json biome.json ./
 COPY packages ./packages
 COPY apps ./apps
@@ -23,7 +24,8 @@ COPY --from=production-dependencies --chown=node:node /app/packages ./packages
 COPY --from=production-dependencies --chown=node:node /app/apps/api ./apps/api
 COPY --from=production-dependencies --chown=node:node /app/apps/mcp ./apps/mcp
 COPY --from=production-dependencies --chown=node:node /app/package.json ./package.json
-RUN mkdir -p /app/athlete_wiki && chown -R node:node /app/athlete_wiki
+COPY --chown=node:node scripts/initialize.ts ./scripts/initialize.ts
+RUN mkdir -p /app/data/db /app/athlete_wiki && chown -R node:node /app/data /app/athlete_wiki
 USER node
 EXPOSE 3000 3001
 CMD ["node", "apps/api/src/server.ts"]

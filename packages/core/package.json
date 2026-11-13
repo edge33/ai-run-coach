@@ -13,10 +13,13 @@
   },
   "dependencies": {
     "@hub/contracts": "workspace:*",
+    "@hub/db": "workspace:*",
     "zod": "4.6.5",
     "pino": "10.3.1",
     "yaml": "2.9.1",
-    "proper-lockfile": "4.1.2"
+    "proper-lockfile": "4.1.2",
+    "@garmin/fitsdk": "21.221.0",
+    "fflate": "0.8.3"
   },
   "devDependencies": {
     "@types/proper-lockfile": "4.1.4"
