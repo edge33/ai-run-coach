@@ -13,9 +13,8 @@ Import staging is disposable temporary storage and is removed when the import en
 
 ## Runtime image
 
-Bind-mount one host directory at `/app/data` in every runtime container
-(initializer, API and MCP). The image defaults are `/app/data/db/coach.sqlite` and
-`/app/data/athlete_wiki`; no path overrides are needed. The root `compose.yaml` demonstrates
+Bind-mount one host directory at `/app/data` in the single `hub` container. The image defaults
+are `/app/data/db/coach.sqlite` and `/app/data/athlete_wiki`; no path overrides are needed. The root `compose.yaml` demonstrates
 this with `${DATA_PATH:-./data}:/app/data`. By default, files are stored in the repository's
 `data/` directory on the host. Set `DATA_PATH=/srv/running-data-hub/data` in `.env` to choose
 an absolute host location; this setting only controls Compose, not native commands.
@@ -32,16 +31,51 @@ A bind mount hides the image directory and its ownership. If the host path does 
 Compose may create it as root; the non-root initializer then fails with `EACCES` creating
 `/app/data/db`. Prepare ownership on the host first, including in CI.
 
-For an absolute host location, the resolved mount in each runtime service is:
+For an absolute host location, the resolved mount is:
 
 ```yaml
 volumes:
   - /srv/running-data-hub/data:/app/data
 ```
 
-Run `node scripts/initialize.ts` once using the runtime image and the same mount before starting
-API/MCP. Initialization is idempotent and never imports Garmin data. Preserve the mount across
-container replacements. The proxy image serves static assets and needs no data mount.
+The default container command initializes SQLite before starting Nginx, API and MCP. Initialization
+is idempotent, preserves existing records and never imports Garmin data. A failure exits the
+container before services start. Native development still uses `pnpm run db:init` explicitly.
+Preserve the mount across container replacements. No separate initializer or proxy image is needed.
+
+## Published image
+
+Build the default Dockerfile target and publish that one image to your chosen registry. Consumers
+can use the following Compose shape (replace the illustrative image reference with your release):
+
+```yaml
+services:
+  hub:
+    image: ghcr.io/YOUR_OWNER/running-data-hub:YOUR_TAG
+    restart: unless-stopped
+    environment:
+      APP_ORIGINS: https://aicoach.bl
+      GARMIN_API_KEY: ${GARMIN_API_KEY}
+      ATHLETE_TIMEZONE: Europe/Rome
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "8080:8080"
+    stop_grace_period: 30s
+```
+
+Nginx Proxy Manager forwards the configured hostname to this container on port 8080. If both
+containers share a Docker network, point NPM at `hub:8080`; the host `ports` mapping can then be
+omitted. With host forwarding, publish 8080 on an interface reachable by NPM. `APP_ORIGINS` must
+match the browser URL, including scheme and any nonstandard port. Forward the original Host
+header and disable proxy buffering for MCP streaming. The internal proxy already disables
+buffering and preserves `/api` and `/mcp`; its read timeout remains 300 seconds.
+
+The image runs as UID/GID 1000:1000 and exposes only 8080. API and MCP bind to loopback on
+3000/3001. Tini and the startup wrapper forward termination and stop the container if any required
+service exits. The image health check requires the web UI, API and MCP to respond; Docker marks
+unhealthy containers but restart policy restarts on process exit, not on health status alone.
+Logs go to stdout/stderr. An unhealthy result needs investigation if processes remain alive.
 
 ## Existing installations
 

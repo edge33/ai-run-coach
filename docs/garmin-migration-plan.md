@@ -63,13 +63,13 @@ warnings as described in [measurement semantics](run-analysis-data.md).
 
 ## Next action
 
-Review PR #16 storage consolidation and temporary explorer removal. CI now prepares the bind
-directory with runtime UID/GID ownership; local full-stack startup verification passes. Database and wiki now share
-`data/` (Compose bind-mounts `${DATA_PATH:-./data}` at `/app/data`); see [storage setup](storage.md) before moving an
-existing installation. The temporary Garmin explorer, its report guide and explorer-only test
-and workout schema have been removed; production measurement mapping and regression tests remain.
+Review single-container packaging on `feature/single-image-distribution`, based on main after PR #16.
+One runtime image now serves web, API and MCP through port 8080, initializes SQLite locally before
+serving, and uses one host bind mount at `/app/data`. No import occurs at startup. See
+[storage setup](storage.md) for directory ownership, published-image Compose and NPM configuration.
+Validation and any remaining blockers are recorded in [progress](progress.md).
 
 Continue explicit-date UI verification after deployment, respecting server cooldown. Historical
 imports still require explicit dates. No deployment reset or historical import is implied by
 implementation completion. The separately authorized local measurement/history reset is complete;
-the initialized local database is empty. See [progress](progress.md) for validation and cleanup details.
+the initialized local database is empty.

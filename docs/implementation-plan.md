@@ -114,14 +114,21 @@ or cross-process account-wide quota. Pacing and cooldown reads never initiate sy
 There is one current Garmin schema, no migration chain and no legacy conversion path.
 `pnpm run db:init` runs `scripts/initialize.ts` to create empty tables idempotently. It does not
 reset or delete existing data. Initialization rejects an incompatible existing run schema.
-API/MCP startup checks schema readiness and never initializes or imports implicitly.
+Native API/MCP startup checks schema readiness and never initializes or imports implicitly.
 
-Compose runs the one-shot `initialize` service before API/MCP. Only Nginx publishes
-`${BIND_IP:-127.0.0.1}:8080`, serving the web app and proxying `/api` and `/mcp`. Configure
-`APP_ORIGINS` to the externally used origin. API receives `GARMIN_API_KEY`; MCP needs no upstream key.
+The Dockerfile produces one runtime image containing the web build, Nginx, API and MCP. Its
+startup wrapper initializes the current schema before launching the three services under Tini.
+Initialization is local and idempotent; failure prevents serving traffic. An unexpected child exit
+stops its siblings and exits nonzero so Docker can restart the container. SIGTERM/SIGINT cancels
+API work and closes MCP, with up to 25 seconds for child shutdown inside Compose's 30-second grace.
+
+Compose runs one `hub` service and publishes `${BIND_IP:-127.0.0.1}:8080`. Nginx serves the web
+app and proxies `/api` and `/mcp` to loopback-only Node listeners on 3000 and 3001. Only 8080 is
+exposed. The image health check probes web/API/MCP locally and never contacts Garmin. Configure
+`APP_ORIGINS` to the externally used origin and provide `GARMIN_API_KEY` through the environment.
 Database and wiki share the host bind mount `${DATA_PATH:-./data}:/app/data`. The root `compose.yaml`
-is the source-build setup. See [storage setup](storage.md) for image mounts and existing-data moves.
-Keep existing host/origin validation and response limits.
+is the source-build setup. See [storage setup](storage.md) for image-only Compose, proxy setup and
+existing-data moves. Keep existing host/origin validation and response limits.
 
 For native operation: configure ignored `.env`, run `pnpm run db:init`, then `pnpm run dev`.
 The normalized `exportData` core function emits source/mapping metadata and measured records.

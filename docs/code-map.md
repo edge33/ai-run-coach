@@ -20,3 +20,6 @@
 - `apps/mcp/src/tools.ts`: shared semantic tool registry; no upstream access or sync tool.
 - `apps/web/src`: manual date selection and independently paginated local lists.
 - `scripts/initialize.ts`: explicit schema bootstrap.
+- `deploy/start.sh`: container initialization, child process monitoring and shutdown.
+- `deploy/healthcheck.ts`: local web/API/MCP image health check.
+- `deploy/nginx.conf`: single-port static web and loopback API/MCP proxy.
