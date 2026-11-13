@@ -2,6 +2,107 @@
 
 Last updated: 2026-11-13
 
+## Single-image PR handoff (current)
+
+- User authorized pushing the accumulated single-image and CI changes on a new branch and
+  opening a PR. Created `feature/single-image-distribution` from the existing work at `8d38e6d`;
+  fetched `origin/main`, which remains the same base. Worktree: `/home/edge33/dev/ai-run-coach`.
+- Scope: one non-root runtime image and one Compose service for web/API/MCP, local idempotent
+  initialization, Tini/wrapper shutdown and fail-stop behavior, combined health check, one host
+  bind mount, storage/NPM docs, and PR-only CI with current stable action tags and no Compose.
+- Prior validation remains applicable: 79 uncached synthetic tests, formatting/typecheck/lint/build,
+  strict healthcheck TypeScript check, shell syntax, default image build, Compose readiness,
+  single-port HTTP/MCP smoke, replacement persistence, initializer failure and lifecycle fault
+  injection all pass (details below). Final formatting/diff checks and candidate credential/private
+  path scan pass. No new runtime edits after those checks; subsequent changes are CI/docs only.
+- No credentials, local database/wiki or personal configuration included. No registry publication,
+  deployment, upstream Garmin request, historical import or merge performed. Next: review/merge
+  the single-image PR, then build/publish a release and deploy with prepared host storage.
+
+## PR-only CI and current action releases (current)
+
+- User requested current CI action tags and PR-only execution. `.github/workflows/ci.yml`
+  now triggers only on `pull_request` and uses `actions/checkout@v7.0.1`,
+  `actions/setup-node@v7.1.0`, and `pnpm/action-setup@v6.1.1`. Verified these are the latest
+  stable release tags through each official repository's GitHub releases API. Checked action
+  runtime/release metadata for compatibility; hosted Ubuntu runners support the Node 24 action
+  runtime. Repository Node/pnpm pins, cache settings and all application checks are unchanged.
+- Validation: `pnpm run check` (76 files), `git diff --check` and workflow YAML inspection pass.
+  No GitHub Actions run performed locally; it will execute when a PR is opened or updated.
+  No new configuration tests added. Worktree `/home/edge33/dev/ai-run-coach`, branch
+  `feature/single-container-image`, HEAD `8d38e6d`; accumulated changes remain uncommitted.
+- Next: review the single-image implementation and workflow, then publish when requested.
+
+## Remove Compose from CI verification (current)
+
+- User requested removing Compose setup from PR checks. Removed bind-directory preparation,
+  Compose config/startup, Nginx container check, logs/teardown and the Compose project variable
+  from `.github/workflows/ci.yml`. The shared push/PR workflow retains dependency installation,
+  formatting, typecheck, lint, application tests and build. Docker/Compose configuration remains
+  available for local/manual validation; CI no longer builds or starts containers.
+- Validation: `pnpm run check` and `git diff --check` pass. Inspected the final workflow to
+  confirm all application gates remain and no Compose/setup/cleanup steps remain. No runtime
+  changes or new tests in this follow-up; prior application and image validations still apply.
+- Worktree `/home/edge33/dev/ai-run-coach`, branch `feature/single-container-image`, HEAD
+  `8d38e6d`. All accumulated changes remain uncommitted; no push or PR publication this turn.
+  Next: review the single-image packaging and reduced workflow, then publish when requested.
+
+## Single-container distribution (current)
+
+- Fetched latest `origin/main` and created `feature/single-container-image` at `8d38e6d`
+  (merged PR #16) in `/home/edge33/dev/ai-run-coach`. Initial worktree was clean. Changes
+  remain uncommitted; no push, merge, registry publication, real import or local data reset.
+- Dockerfile now has one final `runtime` target: pinned Node 26.13.0 plus Debian Nginx/Tini,
+  production dependencies and built web assets. The separate Alpine proxy target is removed.
+  Runs as node UID/GID 1000:1000 and exposes only 8080. API/MCP defaults bind loopback on
+  3000/3001; Nginx upstreams use those addresses, with writable temporary paths under `/tmp`
+  and stderr logging. Existing host/origin checks, routes and proxy limits remain unchanged.
+- `deploy/start.sh` runs idempotent initialization before serving, monitors API/MCP/Nginx,
+  exits nonzero after any unexpected required-child exit, forwards termination and waits for
+  children with a 25-second forced-shutdown deadline. Tini handles PID 1 forwarding/reaping.
+  Normal SIGTERM/SIGINT exits 0. Initializer failure prevents all services from starting.
+  The initial watcher inherited ignored TERM and delayed ordinary shutdown; fixed by explicitly
+  killing the deadline watcher after children exit. Corrected image passes all lifecycle checks.
+- `deploy/healthcheck.ts` probes local web/API/MCP with bounded timeouts and no upstream access.
+  The image supplies its own health check. Compose now has one `hub` service, one 8080 mapping,
+  one `${DATA_PATH:-./data}:/app/data` bind and 30-second stop grace. Compose validation is
+  manual; the subsequent CI-removal follow-up above supersedes the initial workflow update.
+  Host directory ownership preparation from PR #16 remains required. Native dev commands and
+  application business logic are unchanged. Storage docs include image-only Compose and NPM.
+- Node 26.13.0/pnpm 12.18.0: `pnpm install --frozen-lockfile`, `pnpm run check` (76 files),
+  `pnpm run typecheck`, `pnpm run lint`, `pnpm run build`, `bash -n deploy/start.sh` and
+  `git diff --check` pass. `pnpm exec turbo run test --force` passes all 79 synthetic tests
+  (core 61/API 10/MCP 3/DB 5) outside the sandbox for sockets. Unchanged workspace checks
+  reuse Turbo cache; web build was rebuilt. Standalone strict TypeScript checking of
+  `deploy/healthcheck.ts` also passes (`--noEmit --module nodenext --moduleResolution nodenext
+  --target esnext --allowImportingTsExtensions --esModuleInterop --skipLibCheck`). No deployment
+  tests were added to the repo, per agent guidance; smoke/lifecycle helpers are scratch-only.
+- Synthetic `docker compose --env-file /dev/null config` passes; JSON inspection verifies one
+  service, one bind and one published port. Disposable startup command:
+  `DATA_PATH=/tmp/ai-run-coach-single-image.YutRb7 APP_ORIGINS=http://127.0.0.1:8080
+  BIND_IP=127.0.0.1 GARMIN_API_KEY='' DOCKER_BUILDKIT=0 docker compose --env-file /dev/null
+  -p running-data-hub-single-image-validation up --build -d --wait`. Image builds and reaches
+  healthy; classic builder used because local Buildx is absent. Final corrected image was rebuilt
+  with `DOCKER_BUILDKIT=0 docker build -t running-data-hub:local .`; lifecycle verified below.
+- Single-port smoke passes frontend, API status, MCP initialize/list/status call (12 tools and
+  no sync tool), disallowed-Origin 403 and missing-asset 404. `nginx -t` and image health command
+  pass. Synthetic wellness and wiki records survive forced container replacement and repeated
+  initialization without creating sync history. Incompatible synthetic schema fails at startup
+  with `DATABASE_SCHEMA_MISMATCH` before serving. No Garmin credentials or network calls used.
+- Lifecycle scratch helper verifies normal SIGTERM stop under 5 seconds, SIGINT exit 0,
+  unresponsive API produces failing combined health, and killing API, MCP or Nginx master makes
+  the container exit nonzero (137), stopping siblings. First Nginx probe matched the binary name
+  rather than its rewritten master process title; corrected the scratch selector and reran the
+  full lifecycle successfully. Deliberately stopped API process shuts down in 25.1 seconds,
+  inside the 30-second Compose grace. Docker restart was disabled only on the disposable
+  container during fault injection; the committed Compose keeps `unless-stopped`.
+- Final corrected image also passes `up -d --wait` and `exec hub nginx -t`. Removed the
+  disposable container/network with `down -v` and deleted only its synthetic bind directory.
+  Kept the built `running-data-hub:local` image for review. Candidate credential/private-path
+  scan passes; ignored local configuration/data were not changed.
+- Next: review the single-image changes, then commit/open a PR when requested. No image has
+  been published. Before deployment, prepare/move host data and set the actual external origin.
+
 ## CI bind-mount startup fix (current)
 
 - PR #16 CI run `43449414709` failed during `docker compose up --build -d --wait`:

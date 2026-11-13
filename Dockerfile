@@ -17,8 +17,9 @@ FROM base AS production-dependencies
 RUN pnpm install --prod --frozen-lockfile
 
 FROM node:26.13.0-bookworm-slim AS runtime
-ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000 MCP_PORT=3001 \
+ENV NODE_ENV=production HOST=127.0.0.1 PORT=3000 MCP_PORT=3001 \
     SQLITE_PATH=/app/data/db/coach.sqlite WIKI_PATH=/app/data/athlete_wiki
+RUN apt-get update && apt-get install -y --no-install-recommends nginx tini && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=production-dependencies --chown=node:node /app/node_modules ./node_modules
 COPY --from=production-dependencies --chown=node:node /app/packages ./packages
@@ -27,11 +28,12 @@ COPY --from=production-dependencies --chown=node:node /app/apps/mcp ./apps/mcp
 COPY --from=production-dependencies --chown=node:node /app/package.json ./package.json
 COPY --chown=node:node scripts/initialize.ts ./scripts/initialize.ts
 RUN mkdir -p /app/data/db /app/data/athlete_wiki && chown -R node:node /app/data
-USER node
-EXPOSE 3000 3001
-CMD ["node", "apps/api/src/server.ts"]
-
-FROM nginx:1.28.0-alpine AS proxy
 COPY deploy/nginx.conf /etc/nginx/nginx.conf
+COPY --chown=node:node deploy/start.sh deploy/healthcheck.ts ./deploy/
 COPY --from=web-build /app/apps/web/dist /usr/share/nginx/html
+USER node
 EXPOSE 8080
+HEALTHCHECK --interval=20s --timeout=5s --start-period=10s --retries=3 \
+  CMD ["node", "deploy/healthcheck.ts"]
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["bash", "deploy/start.sh"]
