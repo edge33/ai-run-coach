@@ -1,4 +1,4 @@
-FROM node:26.13.0-bookworm-slim AS base
+FROM node:26.13.1-bookworm-slim AS base
 COPY --from=ghcr.io/pnpm/pnpm:12.18.0 /opt/pnpm /opt/pnpm
 RUN ln -s /opt/pnpm/pnpm /usr/local/bin/pnpm
 WORKDIR /app
@@ -16,7 +16,7 @@ RUN pnpm --filter @hub/web build
 FROM base AS production-dependencies
 RUN pnpm install --prod --frozen-lockfile
 
-FROM node:26.13.0-bookworm-slim AS runtime
+FROM node:26.13.1-bookworm-slim AS runtime
 ENV NODE_ENV=production HOST=127.0.0.1 PORT=3000 MCP_PORT=3001 \
     SQLITE_PATH=/app/data/db/coach.sqlite WIKI_PATH=/app/data/athlete_wiki
 RUN apt-get update && apt-get install -y --no-install-recommends nginx tini && rm -rf /var/lib/apt/lists/*

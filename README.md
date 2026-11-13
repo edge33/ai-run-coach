@@ -47,6 +47,16 @@ pnpm run build
 The PR workflow runs these checks. Container validation is manual and uses disposable data.
 Keep `.env`, databases, athlete wiki content and other personal files out of Git and images.
 
+## Dependency updates
+
+[Enable the Renovate app](https://github.com/apps/renovate) for this repository, then merge
+`renovate.json`. It opens reviewable PRs for pnpm packages/lockfiles, Docker images and GitHub
+Actions. Node, pnpm and Biome pins are grouped; automerge is off. Weekly lockfile maintenance
+keeps indirect dependencies current. The Compose `running-data-hub:local` image is excluded.
+
+Runtime dependency and Dockerfile updates use `fix:` titles for Release Please. Keep that prefix
+when merging; check Node/pnpm versions together and run manual image validation for Docker changes.
+
 ## Documentation
 
 - [Architecture](docs/architecture.md): components, imports and failure handling.

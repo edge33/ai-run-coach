@@ -30,6 +30,7 @@ export function splitWindows(ranges: DateRange[]): DateRange[] {
 
     for (let start = range.start; start <= range.end; start = addDays(start, 31)) {
       const end = addDays(start, 30);
+      // biome-ignore lint/complexity/useMathMinMax: ISO dates compare lexically; Math.min would produce NaN.
       windows.push({ start, end: end < range.end ? end : range.end });
     }
 

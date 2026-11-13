@@ -13,8 +13,8 @@
   },
   "dependencies": {
     "@hub/contracts": "workspace:*",
-    "kysely": "0.29.6",
-    "better-sqlite3": "13.0.3"
+    "kysely": "0.29.8",
+    "better-sqlite3": "13.1.1"
   },
   "devDependencies": {
     "@types/better-sqlite3": "9.6.0"

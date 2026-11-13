@@ -5,6 +5,7 @@ export function mergeRanges(ranges: DateRange[]): DateRange[] {
   for (const range of [...ranges].sort((a, b) => a.start.localeCompare(b.start))) {
     const previous = result.at(-1);
     if (previous && range.start <= addDays(previous.end, 1))
+      // biome-ignore lint/complexity/useMathMinMax: ISO dates compare lexically; Math.max would produce NaN.
       previous.end = previous.end > range.end ? previous.end : range.end;
     else result.push({ ...range });
   }
