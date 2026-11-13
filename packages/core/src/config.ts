@@ -31,7 +31,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     .map((s) => new URL(s.trim()).origin);
   return {
     databasePath: resolve(root, env.SQLITE_PATH ?? 'data/db/coach.sqlite'),
-    wikiPath: resolve(root, env.WIKI_PATH ?? 'athlete_wiki'),
+    wikiPath: resolve(root, env.WIKI_PATH ?? 'data/athlete_wiki'),
     timezone,
     garminRequestIntervalMs,
     apiKey: env.GARMIN_API_KEY ?? '',

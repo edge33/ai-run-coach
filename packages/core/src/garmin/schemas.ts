@@ -44,22 +44,6 @@ export const summarySchema = z.object({
   elevationLoss: measurement,
   averageRunCadence: measurement,
 });
-const steps = z
-  .array(
-    z.object({
-      stepIndex: z.number().int().nonnegative(),
-      intensity: z.string().nullish(),
-      durationType: z.string().nullish(),
-      durationValue: measurement,
-      targetType: z.string().nullish(),
-      targetValue: measurement,
-      targetValueLow: measurement,
-      targetValueHigh: measurement,
-    }),
-  )
-  .max(10000);
-const workouts = z.array(z.object({ steps: steps.optional() })).max(100);
-
 export const activityDetailSchema = z.object({
   activityId: identifier,
   activityTypeDTO: activityType,
@@ -161,7 +145,6 @@ export const garminResponses = {
   hrvRange: { name: 'hrv_range', schema: hrvRangeSchema },
   hrv: { name: 'hrv', schema: hrvSchema },
   weight: { name: 'weight', schema: weightSchema },
-  workouts: { name: 'workouts', schema: workouts },
 };
 
 function receivedType(input: unknown, path: PropertyKey[]): string {

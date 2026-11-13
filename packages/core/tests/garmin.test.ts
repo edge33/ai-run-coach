@@ -15,7 +15,6 @@ import type { z } from 'zod';
 import { listActivities, normalizeSummary, normalizeWellness } from '../src/garmin/api.ts';
 import { GarminClient, parseGarminJson } from '../src/garmin/client.ts';
 import { GarminContractError } from '../src/garmin/errors.ts';
-import { exploreGarmin } from '../src/garmin/explore.ts';
 import { decodeActivityFile, segmentTiming } from '../src/garmin/fit.ts';
 import { mapGarminRun } from '../src/garmin/import.ts';
 import { garminResponses } from '../src/garmin/schemas.ts';
@@ -287,50 +286,6 @@ test('Garmin wellness selects nightly HRV and latest same-day kg weight without 
   );
 });
 
-test('Garmin exploration extracts separate run, planned-step, recorded-lap, sample and wellness evidence', async () => {
-  const client = fakeClient((url) => {
-    if (url.pathname.includes('search/activities'))
-      return Response.json(url.searchParams.get('start') === '0' ? [activity(1)] : []);
-    if (url.pathname.endsWith('/workouts'))
-      return Response.json([
-        {
-          workoutName: 'private',
-          steps: [
-            {
-              stepIndex: 0,
-              intensity: 'ACTIVE',
-              durationType: 'TIME',
-              durationValue: 30,
-              notes: 'private',
-            },
-          ],
-        },
-      ]);
-    if (url.pathname.includes('/files/')) return new Response(Buffer.from(fitFile()));
-    if (url.pathname === '/activity-service/activity/1')
-      return Response.json({
-        activityId: 1,
-        activityTypeDTO: { typeKey: 'running' },
-        summaryDTO: {
-          startTimeLocal: `${date}T08:00:00`,
-          distance: 100,
-          elapsedDuration: 65,
-          duration: 40,
-        },
-      });
-    if (url.pathname.includes('/weight/')) return Response.json({ dailyWeightSummaries: [] });
-    if (url.pathname.includes('/hrv/')) return new Response(null, { status: 204 });
-    return Response.json({ calendarDate: date, restingHeartRate: null, sleepTimeSeconds: null });
-  });
-  const result = await exploreGarmin(client, { start: date, end: date });
-  assert.equal(result.runs.length, 1);
-  assert.equal(result.runs[0].structured_workouts[0].steps?.[0].durationValue, 30);
-  assert.equal(result.runs[0].fit.laps.length, 1);
-  assert.equal(result.runs[0].fit.samples.length, 3);
-  assert.equal(result.wellness[0].hrv_ms, null);
-  assert.ok(!JSON.stringify(result).includes('private'));
-});
-
 test('segment timing preserves source durations and flags differences beyond timestamp precision', () => {
   assert.equal(segmentTiming(0, 10, 9).timing_warning, null);
   assert.equal(segmentTiming(0, 10, 20).timing_warning, 'DURATION_TIMESTAMP_MISMATCH');
@@ -442,11 +397,6 @@ test('Garmin JSON boundaries reject changed required fields and types with sanit
             { summaryDate: date, latestWeight: { calendarDate: date, weight: 'private value' } },
           ],
         },
-      },
-      {
-        name: 'workout step type',
-        contract: garminResponses.workouts,
-        invalid: [{ steps: [{ stepIndex: 'private value' }] }],
       },
     ];
   for (const example of cases)

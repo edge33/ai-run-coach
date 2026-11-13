@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { addDays, localToday, validateRange } from '@hub/contracts';
 import { Store } from '@hub/db';
 import {
@@ -36,6 +37,16 @@ async function setup() {
     },
   };
 }
+
+test('default persistent paths share the repository data directory and allow explicit overrides', () => {
+  const root = fileURLToPath(new URL('../../../', import.meta.url));
+  const config = loadConfig({});
+  assert.equal(config.databasePath, join(root, 'data/db/coach.sqlite'));
+  assert.equal(config.wikiPath, join(root, 'data/athlete_wiki'));
+  const custom = loadConfig({ SQLITE_PATH: '/custom/db.sqlite', WIKI_PATH: '/custom/wiki' });
+  assert.equal(custom.databasePath, '/custom/db.sqlite');
+  assert.equal(custom.wikiPath, '/custom/wiki');
+});
 
 test('local dates and bounded ranges remain independent of UTC', () => {
   assert.equal(localToday('Europe/Rome', new Date('2026-03-28T23:30:00Z')), '2026-03-29');
