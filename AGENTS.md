@@ -1,15 +1,12 @@
 # Running Data Hub agent guide
 
 This repository implements a Garmin-only personal running-data hub. Verify the active branch and
-worktree before changing code. Read:
+worktree before changing code. Read [README.md](README.md) for setup,
+[architecture](docs/architecture.md) for system behavior, and [current work](docs/progress.md)
+for unfinished changes. Consult measurement, storage and release docs when relevant.
 
-1. [`docs/implementation-plan.md`](docs/implementation-plan.md) for scope and architecture.
-2. [`docs/garmin-migration-plan.md`](docs/garmin-migration-plan.md) for current decisions and checklist.
-3. [`docs/progress.md`](docs/progress.md) for implementation, validation and next action.
-
-Update `docs/progress.md` whenever implementation state, validation results, blockers, or the next
-recommended action changes. Record commands and outcomes precisely enough that another agent can
-resume without conversation history.
+Keep `docs/progress.md` short: current work, validation, blockers and next action only.
+Replace stale entries instead of appending handoff history. Put lasting behavior in the topic docs.
 
 ## Repository rules
 
@@ -29,9 +26,8 @@ resume without conversation history.
 - Do not add tests for migrations, maintenance scripts, deployment wiring, or tooling/configuration.
 - Use the Node and pnpm versions pinned in the repository. On a fresh checkout, run `pnpm install --frozen-lockfile`.
 - Run checks appropriate to the change. The full gates are `pnpm run check`, `pnpm run typecheck`,
-  `pnpm run lint`, `pnpm test`, and `pnpm run build`; Compose validation commands are in
-  `docs/progress.md`. Use only disposable synthetic data for validation.
-- Update the Garmin tracker when its checklist, blockers, or next action changes.
+  `pnpm run lint`, `pnpm test`, and `pnpm run build`. Validate containers manually when deployment
+  changes; use disposable synthetic data and record the command/outcome in `docs/progress.md`.
 - Distinguish implementation completion from deployment reset and historical import. Imports require
   explicit dates; never infer a historical import range from database contents.
 - Before handing off, report the branch, commit, uncommitted files, validation outcomes, and next

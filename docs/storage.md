@@ -1,57 +1,28 @@
-# Persistent storage
+# Storage and deployment
 
-All application-owned persistent files live under `data/` by default:
+The app runs as one container on port 8080. Mount a host directory at `/app/data` to keep:
 
-- `data/db/coach.sqlite`, including SQLite WAL/SHM sidecars.
-- `data/athlete_wiki/`, including Markdown pages, revisions, pending proposals and write locks.
+- `db/coach.sqlite` and SQLite WAL/SHM files.
+- `athlete_wiki/`, including pages, revisions and pending proposals.
 
-Native commands resolve these paths from the repository root. Copy `.env.example` to `.env`
-and configure the Garmin key and origins there. Credentials remain in environment configuration,
-not in the data directory or image. `data/` is excluded from Git and the Docker build context.
-`SQLITE_PATH` and `WIKI_PATH` remain available for explicit path overrides.
-Import staging is disposable temporary storage and is removed when the import ends.
-
-## Runtime image
-
-Bind-mount one host directory at `/app/data` in the single `hub` container. The image defaults
-are `/app/data/db/coach.sqlite` and `/app/data/athlete_wiki`; no path overrides are needed. The root `compose.yaml` demonstrates
-this with `${DATA_PATH:-./data}:/app/data`. By default, files are stored in the repository's
-`data/` directory on the host. Set `DATA_PATH=/srv/running-data-hub/data` in `.env` to choose
-an absolute host location; this setting only controls Compose, not native commands.
-
-Create the selected host directory before starting containers and make it writable by the
-image's `node` user (UID/GID 1000:1000). For the default path, run from the repository root:
+Create the directory before starting Docker and make it writable by the image's UID/GID 1000:1000:
 
 ```sh
 mkdir -p data
 sudo chown -R 1000:1000 data
 ```
 
-A bind mount hides the image directory and its ownership. If the host path does not exist,
-Compose may create it as root; the non-root initializer then fails with `EACCES` creating
-`/app/data/db`. Prepare ownership on the host first, including in CI.
+Without this step, Docker may create a root-owned directory and startup will fail with `EACCES`.
+Keep credentials in environment configuration. Data and `.env` are excluded from Git and images.
 
-For an absolute host location, the resolved mount is:
+## Compose with a published image
 
-```yaml
-volumes:
-  - /srv/running-data-hub/data:/app/data
-```
-
-The default container command initializes SQLite before starting Nginx, API and MCP. Initialization
-is idempotent, preserves existing records and never imports Garmin data. A failure exits the
-container before services start. Native development still uses `pnpm run db:init` explicitly.
-Preserve the mount across container replacements. No separate initializer or proxy image is needed.
-
-## Published image
-
-Build the default Dockerfile target and publish that one image to your chosen registry. Consumers
-can use the following Compose shape (replace the illustrative image reference with your release):
+After the [first release](releases.md), replace `YOUR_TAG` with a published version:
 
 ```yaml
 services:
   hub:
-    image: ghcr.io/YOUR_OWNER/running-data-hub:YOUR_TAG
+    image: ghcr.io/edge33/ai-run-coach:YOUR_TAG
     restart: unless-stopped
     environment:
       APP_ORIGINS: https://aicoach.bl
@@ -64,27 +35,37 @@ services:
     stop_grace_period: 30s
 ```
 
-Nginx Proxy Manager forwards the configured hostname to this container on port 8080. If both
-containers share a Docker network, point NPM at `hub:8080`; the host `ports` mapping can then be
-omitted. With host forwarding, publish 8080 on an interface reachable by NPM. `APP_ORIGINS` must
-match the browser URL, including scheme and any nonstandard port. Forward the original Host
-header and disable proxy buffering for MCP streaming. The internal proxy already disables
-buffering and preserves `/api` and `/mcp`; its read timeout remains 300 seconds.
+Startup initializes missing schema objects without deleting existing records or contacting Garmin.
+An incompatible schema stops startup. Keep the mount when replacing or upgrading containers.
+Logs go to stdout/stderr; the image includes a web/API/MCP health check.
 
-The image runs as UID/GID 1000:1000 and exposes only 8080. API and MCP bind to loopback on
-3000/3001. Tini and the startup wrapper forward termination and stop the container if any required
-service exits. The image health check requires the web UI, API and MCP to respond; Docker marks
-unhealthy containers but restart policy restarts on process exit, not on health status alone.
-Logs go to stdout/stderr. An unhealthy result needs investigation if processes remain alive.
+For a source build, use the repository's `compose.yaml`. Copy `.env.example` to `.env`, set the
+Garmin key, prepare the data directory, then run:
 
-## Existing installations
+```sh
+APP_ORIGINS=http://127.0.0.1:8080 docker compose up --build -d
+```
 
-Stop API/MCP and any other database/wiki writers before moving files. Move the existing database
-and any WAL/SHM sidecars into `data/db/`, and the contents of the old `athlete_wiki/` directory
-into `data/athlete_wiki/`. Update an existing ignored `.env` if it still sets
-`WIKI_PATH=athlete_wiki`. Personal MCP configuration may also contain an old path override.
+This setup binds to loopback by default. Set `BIND_IP` to an interface reachable by your proxy
+if needed. `DATA_PATH` selects the host directory (default `./data`, relative to Compose).
+Native development uses `data/` under the repository root; `SQLITE_PATH` and `WIKI_PATH` override
+its database/wiki paths. `DATA_PATH` affects Compose only.
 
-Earlier Compose setups used separate `database` and `wiki` volumes. Copy their contents into
-`db/` and `athlete_wiki/` respectively in the selected host directory before starting the updated
-services. Changing the Compose configuration does not copy old volumes automatically. Keep the
-old volumes until the transferred data has been verified; do not use `down -v` on a real stack.
+## Nginx Proxy Manager
+
+Forward your hostname to the app's port 8080. On a shared Docker network, use `hub:8080` and omit
+the host port mapping. Otherwise publish the port on an interface NPM can reach.
+
+`APP_ORIGINS` must match the browser URL, including scheme and any nonstandard port. Preserve the
+original Host header and disable proxy buffering for MCP streaming. The internal proxy routes
+`/api` and `/mcp` and has a 300-second read timeout. Origin checks are not authentication.
+
+## Moving existing data
+
+Stop all writers first. Put the database and any WAL/SHM sidecars in `data/db/`, and the old wiki
+contents in `data/athlete_wiki/`. Update old `WIKI_PATH=athlete_wiki` overrides, including any
+personal MCP configuration. Earlier `database`/`wiki` named volumes need copying to those host
+subdirectories; Compose does not move them automatically. Retain the originals until verified.
+
+`docker compose down` preserves bind-mounted files. Do not use `down -v` on installations that
+still hold data in named volumes. There is no built-in backup system.
