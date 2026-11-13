@@ -26,8 +26,11 @@ Last updated: 2026-11-13
   network and bind directory after verification. No real data/imports involved.
 - First fix push `0b14b9f` had no jobs: `runner.temp` was placed in job-level env, where the
   runner context is unavailable. Moved it to step env and persisted the path via `GITHUB_ENV`.
-- Worktree `/home/edge33/dev/ai-run-coach`, branch `chore/data-directory-cleanup`. Next: verify
-  GitHub CI on existing PR #16 and review/merge before single-container work.
+- Fix commit `2beeab2` passes GitHub PR workflow `43450559239`, including every application
+  gate, bind directory preparation, `docker compose up --build -d --wait`, `nginx -t` and
+  cleanup. Final documentation records this verified result.
+- Worktree `/home/edge33/dev/ai-run-coach`, branch `chore/data-directory-cleanup`. Next:
+  review/merge PR #16 before single-container work. No remaining startup blocker.
 
 ## Cleanup and storage PR handoff (current)
 
