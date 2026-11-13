@@ -1,13 +1,24 @@
 # Code map
 
-- `apps/api/src/app.ts`: health and unavailable-data status routes, host/origin validation.
-- `apps/mcp/src/tools.ts`: the five athlete-wiki tools and bounded responses.
-- `apps/mcp/src/app.ts`, `http.ts`, `stdio.ts`: MCP transports and startup.
-- `apps/web/src/App.tsx`: the unavailable-measurements screen.
-- `packages/core/src/wiki.ts`: Markdown facts, provenance, revisions, confirmation and locking.
-- `packages/core/src/config.ts`: wiki paths, origins, hosts and logging.
-- `packages/contracts/src/index.ts`: shared wiki validation.
-- `packages/config`: shared TypeScript settings.
-- `compose.yaml`, `Dockerfile`, `deploy/nginx.conf`: application shell deployment.
-
-There is no data provider, application database, migration system, or synchronization pipeline.
+- `packages/contracts/src/index.ts`: measurement, query, response and wiki schemas.
+- `packages/db/src/initialize.ts`: current Garmin-only SQLite schema statements; no migrations.
+- `packages/db/src/store.ts`: connection ownership, initialization and atomic staged publication.
+- `packages/db/src/runs.ts`: run, lap, split and sample reads/writes.
+- `packages/db/src/wellness.ts`: dated health measurements.
+- `packages/db/src/leases.ts` / `sync.ts`: writer leases, history, issues and coverage.
+- `packages/core/src/garmin/client.ts`: bounded Personal API authentication/requests.
+- `packages/core/src/garmin/schemas.ts`: named upstream response contracts and sanitized validation.
+- `packages/core/src/garmin/errors.ts`: upstream request and contract errors.
+- `packages/core/src/garmin/api.ts`: JSON pagination and measurement normalization.
+- `packages/core/src/garmin/explore.ts`: development-only private source investigation.
+- `packages/core/src/garmin/fit.ts`: bounded FIT/ZIP decoding, units and source timing warnings.
+- `packages/core/src/garmin/import.ts`: measured-record mapping and dated bulk wellness joins.
+- `packages/core/src/garmin/request-gate.ts`: cancellable pacing and API-instance cooldown.
+- `packages/core/src/sync.ts`: explicit-date, all-or-nothing import orchestration.
+- `packages/core/src/summaries.ts` / `export.ts`: local summaries and normalized export.
+- `packages/core/src/wiki.ts`: private athlete-context persistence and confirmation workflow.
+- `apps/api/src/routes`: schema-bounded local reads and request-bound manual import.
+- `apps/mcp/src/tools.ts`: shared semantic tool registry; no upstream access or sync tool.
+- `apps/web/src`: manual date selection and independently paginated local lists.
+- `scripts/initialize.ts`: explicit schema bootstrap.
+- `scripts/explore-garmin.ts`: standalone private extraction report, no SQLite writes.

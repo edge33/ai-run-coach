@@ -3,12 +3,26 @@ import { fileURLToPath } from 'node:url';
 import pino from 'pino';
 
 export interface Config {
+  databasePath: string;
   wikiPath: string;
+  timezone: string;
+  apiKey: string;
+  garminRequestIntervalMs: number;
   origins: string[];
   hosts: string[];
 }
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
+  const garminRequestIntervalMs = Number(env.GARMIN_REQUEST_INTERVAL_MS ?? '1000');
+  if (
+    !Number.isInteger(garminRequestIntervalMs) ||
+    garminRequestIntervalMs < 0 ||
+    garminRequestIntervalMs > 60000
+  ) {
+    throw new Error('INVALID_GARMIN_REQUEST_INTERVAL_MS');
+  }
   const root = fileURLToPath(new URL('../../../', import.meta.url));
+  const timezone = env.ATHLETE_TIMEZONE ?? 'Europe/Rome';
+  new Intl.DateTimeFormat('en', { timeZone: timezone });
   const origins = (
     env.APP_ORIGINS ??
     'http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001'
@@ -16,7 +30,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     .split(',')
     .map((s) => new URL(s.trim()).origin);
   return {
+    databasePath: resolve(root, env.SQLITE_PATH ?? 'data/db/coach.sqlite'),
     wikiPath: resolve(root, env.WIKI_PATH ?? 'athlete_wiki'),
+    timezone,
+    garminRequestIntervalMs,
+    apiKey: env.GARMIN_API_KEY ?? '',
     origins,
     hosts: [...new Set(origins.map((origin) => new URL(origin).host))],
   };

@@ -1,0 +1,22 @@
+{
+  "name": "@hub/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome lint .",
+    "test": "node --test --test-isolation=none \"tests/*.test.ts\""
+  },
+  "dependencies": {
+    "@hub/contracts": "workspace:*",
+    "kysely": "0.29.6",
+    "better-sqlite3": "13.0.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "9.6.0"
+  }
+}

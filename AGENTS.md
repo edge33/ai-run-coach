@@ -1,12 +1,11 @@
 # Running Data Hub agent guide
 
-This repository implements a personal running-data hub. It currently contains the application
-shell and athlete wiki only. Verify the active branch and worktree before making changes.
+This repository implements a Garmin-only personal running-data hub. Verify the active branch and
+worktree before changing code. Read:
 
-Before changing code, read:
-
-1. [`docs/implementation-plan.md`](docs/implementation-plan.md) for the approved scope and architecture.
-2. [`docs/progress.md`](docs/progress.md) for the current implementation and validation state.
+1. [`docs/implementation-plan.md`](docs/implementation-plan.md) for scope and architecture.
+2. [`docs/garmin-migration-plan.md`](docs/garmin-migration-plan.md) for current decisions and checklist.
+3. [`docs/progress.md`](docs/progress.md) for implementation, validation and next action.
 
 Update `docs/progress.md` whenever implementation state, validation results, blockers, or the next
 recommended action changes. Record commands and outcomes precisely enough that another agent can
@@ -15,8 +14,8 @@ resume without conversation history.
 ## Repository rules
 
 - Use SQLite everywhere. Do not introduce PostgreSQL support.
-- The legacy data pipeline has been removed. A future Garmin integration is separate work.
-  Reads from the web app or MCP must never trigger upstream synchronization.
+- Synchronization is manual and read-only against Garmin Connect. Reads from the web app or MCP must
+  never trigger upstream synchronization.
 - Training periods, coaching interpretation, and training plans belong to MCP-connected agents, not
   server-side domain models.
 - Keep real athlete data, credentials, SQLite databases and WAL files, raw snapshots, backups, and
@@ -26,14 +25,17 @@ resume without conversation history.
 
 ## Validation and handoff
 
-- Write automated tests only for application logic and observable application behavior. Do not add
-  tests for migrations, maintenance scripts, deployment wiring, or tooling/configuration.
+- Keep API, MCP, core logic, and storage tests. Do not add web app tests.
+- Do not add tests for migrations, maintenance scripts, deployment wiring, or tooling/configuration.
 - Use the Node and pnpm versions pinned in the repository. On a fresh checkout, run `pnpm install --frozen-lockfile`.
 - Run checks appropriate to the change. The full gates are `pnpm run check`, `pnpm run typecheck`,
   `pnpm run lint`, `pnpm test`, and `pnpm run build`; Compose validation commands are in
   `docs/progress.md`. Use only disposable synthetic data for validation.
+- Update the Garmin tracker when its checklist, blockers, or next action changes.
 - Distinguish implementation completion from deployment reset and historical import. Imports require
   explicit dates; never infer a historical import range from database contents.
 - Before handing off, report the branch, commit, uncommitted files, validation outcomes, and next
   action. A fresh clone does not include uncommitted work or ignored local configuration/data.
 - Keep local credentials, athlete wiki, and personal MCP configuration out of handoff commits.
+- The database uses one current schema initializer (`pnpm run db:init`), not a migration chain.
+  Do not reintroduce legacy source models or migrations.
