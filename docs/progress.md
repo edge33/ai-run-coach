@@ -2,6 +2,30 @@
 
 Last updated: 2026-11-13
 
+## CI bind-mount startup fix (current)
+
+- PR #16 CI run `43449414709` failed during `docker compose up --build -d --wait`:
+  initializer logged `EACCES: permission denied, mkdir '/app/data/db'`. The missing host bind
+  directory was created by Docker as root, hiding image-layer ownership. Initial bind config
+  validation did not exercise this fresh-checkout startup requirement.
+- CI now sets `DATA_PATH=${{ runner.temp }}/running-data-hub-validation-data` and prepares it
+  before Compose with `sudo install -d -m 0755 -o 1000 -g 1000 "$DATA_PATH"`. All Compose steps
+  share this path. Storage docs explain host ownership and the root-created-directory failure.
+  Application logic, image runtime identity and user data are unchanged.
+- Local disposable full-stack validation passes with
+  `DATA_PATH=/tmp/ai-run-coach-bind-ci.oaLZYM APP_ORIGINS=http://127.0.0.1:8080
+  BIND_IP=127.0.0.1 GARMIN_API_KEY='' DOCKER_BUILDKIT=0 docker compose --env-file /dev/null
+  -p running-data-hub-bind-ci-validation up --build -d --wait`. Directory prepared as UID/GID
+  1000:1000; classic builder used because local Buildx is unavailable. Initializer exits 0;
+  API, MCP and Nginx all healthy. `exec nginx nginx -t` passes, and proxy `/api/status` confirms
+  zero runs/health dates, empty coverage and no history. An initial ad hoc status assertion used
+  nonexistent `source_configured`; corrected to actual status fields, with no application change.
+- `pnpm run check` (75 files) and `git diff --check` pass. No new tests for CI/deployment wiring
+  per repository rules; prior 79 application tests still apply. Removed disposable containers,
+  network and bind directory after verification. No real data/imports involved.
+- Worktree `/home/edge33/dev/ai-run-coach`, branch `chore/data-directory-cleanup`. Next: push
+  this fix to existing PR #16, verify GitHub CI, and review/merge before single-container work.
+
 ## Cleanup and storage PR handoff (current)
 
 - User authorized committing/pushing `chore/data-directory-cleanup` and opening a PR against

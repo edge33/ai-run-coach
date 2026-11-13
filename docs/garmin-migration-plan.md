@@ -63,7 +63,8 @@ warnings as described in [measurement semantics](run-analysis-data.md).
 
 ## Next action
 
-Review the storage consolidation and temporary explorer removal. Database and wiki now share
+Review PR #16 storage consolidation and temporary explorer removal. CI now prepares the bind
+directory with runtime UID/GID ownership; local full-stack startup verification passes. Database and wiki now share
 `data/` (Compose bind-mounts `${DATA_PATH:-./data}` at `/app/data`); see [storage setup](storage.md) before moving an
 existing installation. The temporary Garmin explorer, its report guide and explorer-only test
 and workout schema have been removed; production measurement mapping and regression tests remain.

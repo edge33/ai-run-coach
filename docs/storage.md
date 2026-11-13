@@ -28,6 +28,10 @@ mkdir -p data
 sudo chown -R 1000:1000 data
 ```
 
+A bind mount hides the image directory and its ownership. If the host path does not exist,
+Compose may create it as root; the non-root initializer then fails with `EACCES` creating
+`/app/data/db`. Prepare ownership on the host first, including in CI.
+
 For an absolute host location, the resolved mount in each runtime service is:
 
 ```yaml

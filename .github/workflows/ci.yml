@@ -5,6 +5,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       COMPOSE_PROJECT_NAME: running-data-hub-validation
+      DATA_PATH: ${{ runner.temp }}/running-data-hub-validation-data
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -18,6 +19,8 @@ jobs:
       - run: pnpm run lint
       - run: pnpm test
       - run: pnpm run build
+      - name: Prepare bind-mounted data directory
+        run: sudo install -d -m 0755 -o 1000 -g 1000 "$DATA_PATH"
       - run: docker compose config --quiet
       - run: docker compose up --build -d --wait
         env:
