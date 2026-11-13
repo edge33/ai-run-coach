@@ -1,0 +1,40 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":semanticCommits",
+    "group:pnpm",
+    "customManagers:biomeVersions"
+  ],
+  "enabledManagers": [
+    "npm",
+    "dockerfile",
+    "docker-compose",
+    "github-actions",
+    "nvm",
+    "custom.jsonata"
+  ],
+  "automerge": false,
+  "lockFileMaintenance": {
+    "enabled": true
+  },
+  "packageRules": [
+    {
+      "matchPackageNames": ["node"],
+      "groupName": "Node.js"
+    },
+    {
+      "matchPackageNames": ["@biomejs/biome"],
+      "groupName": "Biome"
+    },
+    {
+      "matchManagers": ["dockerfile"],
+      "semanticCommitType": "fix"
+    },
+    {
+      "matchManagers": ["docker-compose"],
+      "matchPackageNames": ["running-data-hub"],
+      "enabled": false
+    }
+  ]
+}

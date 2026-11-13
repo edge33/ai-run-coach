@@ -6,13 +6,13 @@ zero stays zero, and missing days are never filled from neighboring days.
 
 ## Stored records
 
-| Record | Meaning |
-| --- | --- |
-| Run | Exact source ID, local start time, distances, durations, speeds, HR, power, elevation and cadence |
-| Lap | A watch-recorded division, in its original sequence |
-| Split | A Garmin-classified section, which can span several laps |
-| Sample | A recorded point, keeping its original index, timestamp gaps and duplicate times |
-| Wellness | Dated resting HR, nightly HRV, sleep excluding naps, and latest same-day weight in kg |
+| Record   | Meaning                                                                                           |
+| -------- | ------------------------------------------------------------------------------------------------- |
+| Run      | Exact source ID, local start time, distances, durations, speeds, HR, power, elevation and cadence |
+| Lap      | A watch-recorded division, in its original sequence                                               |
+| Split    | A Garmin-classified section, which can span several laps                                          |
+| Sample   | A recorded point, keeping its original index, timestamp gaps and duplicate times                  |
+| Wellness | Dated resting HR, nightly HRV, sleep excluding naps, and latest same-day weight in kg             |
 
 Laps and splits describe the same activity: do not add their totals together. Keep only split
 types beginning with `interval`, preserving Garmin's spelling and sequence gaps. Exclude the

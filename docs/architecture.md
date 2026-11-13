@@ -7,15 +7,15 @@ for conflicting or inferred facts. [Measurement rules](run-analysis-data.md) exp
 
 ## Project layout
 
-| Location | Purpose |
-| --- | --- |
-| `apps/web` | React/Vite UI: manual Sync and paginated run/health lists |
-| `apps/api` | Fastify API: local reads and cancellable imports |
-| `apps/mcp` | Local tools over stdio or Streamable HTTP; no sync tool |
-| `packages/contracts` | Shared schemas, units and request limits |
-| `packages/core` | Garmin extraction, imports, summaries, wiki and export |
-| `packages/db` | SQLite schema and repositories using Kysely/better-sqlite3 |
-| `deploy` | Container startup, health check and Nginx configuration |
+| Location             | Purpose                                                    |
+| -------------------- | ---------------------------------------------------------- |
+| `apps/web`           | React/Vite UI: manual Sync and paginated run/health lists  |
+| `apps/api`           | Fastify API: local reads and cancellable imports           |
+| `apps/mcp`           | Local tools over stdio or Streamable HTTP; no sync tool    |
+| `packages/contracts` | Shared schemas, units and request limits                   |
+| `packages/core`      | Garmin extraction, imports, summaries, wiki and export     |
+| `packages/db`        | SQLite schema and repositories using Kysely/better-sqlite3 |
+| `deploy`             | Container startup, health check and Nginx configuration    |
 
 Training periods, plans, readiness and coaching interpretation belong to connected agents.
 The server stores measured data and calculates summaries on demand; it has no training-load model.
