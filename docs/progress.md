@@ -4,23 +4,33 @@ Updated: 2026-11-14. Keep this file to the active work; Git holds the history.
 
 ## Status
 
-Worktree: `/home/edge33/dev/ai-run-coach`. Branch: `chore/renovate-docker-digests`.
-Base: `d00b5e4`. User requested committing/pushing the digest-pinning config and opening a PR.
+Worktree: `/home/edge33/dev/ai-run-coach`. Branch: `fix/docker-data-permissions`.
+Base: `15d58b7` (`origin/main`). Implementation complete; PR requested.
 
-Added Renovate's `docker:pinDigests` preset. Registry image references keep their version tags
-and gain SHA-256 digest pins through Renovate PRs; later digest updates are also proposed.
-The existing local Compose image exclusion, version groups and no-automerge policy remain.
-Dockerfiles/image versions were not changed manually; no image build, publication or import ran.
+Container entrypoint prepares `/app/data` as root, then uses `setpriv` to run the startup
+wrapper and services as node (1000:1000). Explicit non-root overrides skip ownership setup.
+Storage/architecture docs cover automatic setup, existing-file ownership and restricted mounts.
+No deployment reset, historical import or registry publication performed.
 
 ## Validation
 
-- Node 26.13.1 / pnpm 12.18.0: frozen install, `pnpm run check` (92 files), and
-  `git diff --check`: pass. Store access required outside-sandbox execution.
-- `pnpm --package=renovate@44.239.0 dlx renovate-config-validator --strict renovate.json`: pass.
-  Optional native RE2 was unavailable; Renovate used its JavaScript regex fallback.
-- No application/deployment tests needed for this configuration-only change.
+- Node 26.13.1 / pnpm 12.18.0: `pnpm run check`, `pnpm run typecheck`, `pnpm run lint`,
+  `pnpm test` (79 tests), and `pnpm run build`: pass. API/MCP tests required outside-sandbox
+  local port binding; the initial sandboxed test run failed with `listen EPERM`.
+- `bash -n deploy/entrypoint.sh deploy/start.sh` and `git diff --check`: pass.
+- `docker build -t running-data-hub:permission-validation .`: pass.
+- Manual Docker checks used a disposable `/tmp/hub-permissions-*` bind mount, synthetic wiki
+  content, no credentials and `--network none`. The old local image failed with
+  `EACCES: permission denied, mkdir '/app/data/db'`; the new image initialized successfully.
+- `docker exec hub-permissions-validation node deploy/healthcheck.ts`: pass after fresh startup,
+  restart with root-owned existing data, and `--user 1000:1000` with prepared data. `/proc`
+  confirmed API/MCP/Nginx/start wrapper UID 1000 (Tini remains root). Synthetic wiki preserved.
+- `docker stop --time 30 hub-permissions-validation`: clean exit 0. Non-root with unwritable
+  tmpfs fails with EACCES; read-only bind mount fails with ownership guidance before services
+  start. `docker run --rm --network none running-data-hub:permission-validation id -u`: 1000.
+- Disposable containers/data removed. No deployment-wiring tests added per repository policy.
 
 ## Next action
 
-Review/merge the config change, then review Renovate's initial image-pin PR and validate its
-image build before merging. No merge, image publication or deployment performed by the agent.
+Review and merge the PR, then publish/deploy a new image and update the installation's image
+pin. Existing v0.1.2 images do not include this fix. No remaining implementation blockers.
