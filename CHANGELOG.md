@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/edge33/ai-run-coach/compare/v0.1.2...v0.1.3) (2026-11-14)
+
+
+### Bug Fixes
+
+* prepare Docker data mount permissions before dropping privileges ([#31](https://github.com/edge33/ai-run-coach/issues/31)) ([08e7022](https://github.com/edge33/ai-run-coach/commit/08e70223225904bf5fecf1446cf5c1dcaed4b24f))
+
 ## [0.1.2](https://github.com/edge33/ai-run-coach/compare/v0.1.1...v0.1.2) (2026-11-14)
 
 
