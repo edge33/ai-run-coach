@@ -1,5 +1,5 @@
 FROM node:26.13.1-bookworm-slim AS base
-COPY --from=ghcr.io/pnpm/pnpm:12.20.0 /opt/pnpm /opt/pnpm
+COPY --from=ghcr.io/pnpm/pnpm:12.21.0 /opt/pnpm /opt/pnpm
 RUN ln -s /opt/pnpm/pnpm /usr/local/bin/pnpm
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
