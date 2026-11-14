@@ -52,7 +52,8 @@ Keep `.env`, databases, athlete wiki content and other personal files out of Git
 [Enable the Renovate app](https://github.com/apps/renovate) for this repository, then merge
 `renovate.json`. It opens reviewable PRs for pnpm packages/lockfiles, Docker images and GitHub
 Actions. Node, pnpm and Biome pins are grouped; automerge is off. Weekly lockfile maintenance
-keeps indirect dependencies current. The Compose `running-data-hub:local` image is excluded.
+keeps indirect dependencies current. Renovate proposes SHA-256 digest pins for registry images
+and keeps them updated. The Compose `running-data-hub:local` image is excluded.
 
 Runtime dependency and Dockerfile updates use `fix:` titles for Release Please. Keep that prefix
 when merging; check Node/pnpm versions together and run manual image validation for Docker changes.
