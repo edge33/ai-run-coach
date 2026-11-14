@@ -5,14 +5,16 @@ The app runs as one container on port 8080. Mount a host directory at `/app/data
 - `db/coach.sqlite` and SQLite WAL/SHM files.
 - `athlete_wiki/`, including pages, revisions and pending proposals.
 
-Create the directory before starting Docker and make it writable by the image's UID/GID 1000:1000:
+On startup, the entrypoint runs as root, creates the database/wiki directories and recursively
+sets ownership of `/app/data` to UID/GID 1000:1000. It then switches to the `node` user before
+initializing SQLite and starting API, MCP and Nginx. Docker can create a missing host directory;
+no manual `mkdir` or `chown` is needed for a normal local bind mount.
 
-```sh
-mkdir -p data
-sudo chown -R 1000:1000 data
-```
-
-Without this step, Docker may create a root-owned directory and startup will fail with `EACCES`.
+Existing mounted files also become owned by 1000:1000. On mounts that reject ownership changes
+(such as some NFS/SMB shares), prepare access to the data directory on the host and set Compose
+`user: "1000:1000"` to skip ownership setup. Any explicit non-root `user:` override skips setup
+and requires writable data paths. Custom `SQLITE_PATH`/`WIKI_PATH` locations outside `/app/data`
+must also be prepared separately.
 Keep credentials in environment configuration. Data and `.env` are excluded from Git and images.
 
 ## Compose with a published image
@@ -40,7 +42,7 @@ An incompatible schema stops startup. Keep the mount when replacing or upgrading
 Logs go to stdout/stderr; the image includes a web/API/MCP health check.
 
 For a source build, use the repository's `compose.yaml`. Copy `.env.example` to `.env`, set the
-Garmin key, prepare the data directory, then run:
+Garmin key, then run:
 
 ```sh
 APP_ORIGINS=http://127.0.0.1:8080 docker compose up --build -d

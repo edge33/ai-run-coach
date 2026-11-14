@@ -48,7 +48,9 @@ memory and clears on restart. Expiry never starts another import automatically.
 ## Runtime and operations
 
 One image runs Nginx, API and MCP, exposing only port 8080. API/MCP listen on loopback internally.
-Tini and a startup wrapper handle child exits and shutdown. The wrapper initializes SQLite first;
+Tini and a startup wrapper handle child exits and shutdown. A root entrypoint prepares ownership
+of `/app/data`, then drops to `node` before running the wrapper. Explicit non-root user overrides
+skip ownership setup. The wrapper initializes SQLite first;
 this creates missing tables/indexes, preserves current data and rejects an incompatible schema.
 It is not a migration runner. Native development runs `pnpm run db:init` explicitly.
 
