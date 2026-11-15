@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.0](https://github.com/edge33/ai-run-coach/compare/v0.1.3...v0.2.0) (2026-11-15)
+
+
+### Features
+
+* persist coaching plans and journal through MCP ([#34](https://github.com/edge33/ai-run-coach/issues/34)) ([411ea3d](https://github.com/edge33/ai-run-coach/commit/411ea3dce0537e6aed74bab7795043d4049b4fc9))
+
+
+### Bug Fixes
+
+* **deps:** update dependency better-sqlite3 to v13.2.0 ([#27](https://github.com/edge33/ai-run-coach/issues/27)) ([c06fdb5](https://github.com/edge33/ai-run-coach/commit/c06fdb5edbb21e93948077f6509f467e7937df86))
+
 ## [0.1.3](https://github.com/edge33/ai-run-coach/compare/v0.1.2...v0.1.3) (2026-11-14)
 
 
