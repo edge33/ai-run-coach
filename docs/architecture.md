@@ -19,6 +19,9 @@ for conflicting or inferred facts. [Measurement rules](run-analysis-data.md) exp
 
 Training periods, plans, readiness and coaching interpretation belong to connected agents.
 The server stores measured data and calculates summaries on demand; it has no training-load model.
+MCP also persists agent-authored plan versions, athlete acceptance and dated journal entries in
+the private wiki. These documents have no server-side coaching interpretation. See
+[coaching storage](coaching-storage.md) for tools, provenance and concurrency rules.
 
 ## Imports
 

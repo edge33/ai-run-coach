@@ -1,36 +1,38 @@
 # Current work
 
-Updated: 2026-11-14. Keep this file to the active work; Git holds the history.
+Updated: 2026-11-15.
 
 ## Status
 
-Worktree: `/home/edge33/dev/ai-run-coach`. Branch: `fix/docker-data-permissions`.
-Base: `15d58b7` (`origin/main`). Implementation complete; PR requested.
+Worktree: `/home/edge33/dev/ai-run-coach`. Branch: `feature/coaching-storage`.
+Base commit: `083e8d6` (`main`). Implementation and code review complete; PR publication requested.
 
-Container entrypoint prepares `/app/data` as root, then uses `setpriv` to run the startup
-wrapper and services as node (1000:1000). Explicit non-root overrides skip ownership setup.
-Storage/architecture docs cover automatic setup, existing-file ownership and restricted mounts.
-No deployment reset, historical import or registry publication performed.
+Private wiki storage now supports immutable agent-authored plan versions, explicit athlete
+acceptance/cancellation with one active version, and dated journal reports/interpretations.
+Six MCP tools expose bounded reads and writes with revision checks and safe retries. Profile
+fact contracts are unchanged; Garmin data, SQLite schema and the web UI are unchanged. Lasting
+contracts, limits and provenance rules are in [coaching storage](coaching-storage.md).
 
 ## Validation
 
-- Node 26.13.1 / pnpm 12.18.0: `pnpm run check`, `pnpm run typecheck`, `pnpm run lint`,
-  `pnpm test` (79 tests), and `pnpm run build`: pass. API/MCP tests required outside-sandbox
-  local port binding; the initial sandboxed test run failed with `listen EPERM`.
-- `bash -n deploy/entrypoint.sh deploy/start.sh` and `git diff --check`: pass.
-- `docker build -t running-data-hub:permission-validation .`: pass.
-- Manual Docker checks used a disposable `/tmp/hub-permissions-*` bind mount, synthetic wiki
-  content, no credentials and `--network none`. The old local image failed with
-  `EACCES: permission denied, mkdir '/app/data/db'`; the new image initialized successfully.
-- `docker exec hub-permissions-validation node deploy/healthcheck.ts`: pass after fresh startup,
-  restart with root-owned existing data, and `--user 1000:1000` with prepared data. `/proc`
-  confirmed API/MCP/Nginx/start wrapper UID 1000 (Tini remains root). Synthetic wiki preserved.
-- `docker stop --time 30 hub-permissions-validation`: clean exit 0. Non-root with unwritable
-  tmpfs fails with EACCES; read-only bind mount fails with ownership guidance before services
-  start. `docker run --rm --network none running-data-hub:permission-validation id -u`: 1000.
-- Disposable containers/data removed. No deployment-wiring tests added per repository policy.
+Node 26.13.1 / pnpm 12.18.0:
 
-## Next action
+- `pnpm run check`, `pnpm run typecheck`, `pnpm run lint`, `pnpm run build`: pass.
+- `pnpm test`: 85 tests pass, including plan persistence, concurrency, acceptance lifecycle,
+  retry conflicts, journal attribution/corrections, validation and MCP workflow coverage.
+  The sandboxed run hit existing API port-binding and stdio restrictions; the full suite
+  passes outside the sandbox using disposable synthetic data.
+- `git diff --check`: pass. No dependency or lockfile changes; no web tests added.
 
-Review and merge the PR, then publish/deploy a new image and update the installation's image
-pin. Existing v0.1.2 images do not include this fix. No remaining implementation blockers.
+No deployment, database reset, historical import or real athlete-data changes performed.
+No container validation needed: deployment configuration is unchanged.
+
+## Review and next action
+
+Sub-agent review found one accepted P2 limitation: the shared wiki reader now caps profile pages
+at 600,000 bytes rather than characters, while profile writes do not enforce that limit. Large
+Unicode profile pages can become unreadable after a successful save. User accepted leaving this
+unchanged. The separate spec review found no actionable issues.
+
+Publish the PR, then write the running-coach skill and persona against these MCP contracts.
+No implementation blockers. No deployment or data reset is required for review.
