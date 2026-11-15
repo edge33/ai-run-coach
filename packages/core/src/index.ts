@@ -1,3 +1,4 @@
+export * from './coaching-wiki.ts';
 export * from './config.ts';
 export * from './export.ts';
 export { GarminRateLimitError } from './garmin/errors.ts';

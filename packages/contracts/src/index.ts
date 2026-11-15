@@ -1,12 +1,8 @@
 import { z } from 'zod';
 
-export const dateSchema = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/)
-  .refine((value) => {
-    const parsed = new Date(`${value}T00:00:00Z`);
-    return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
-  }, 'Use a valid YYYY-MM-DD date');
+import { dateSchema } from './date.ts';
+
+export { dateSchema } from './date.ts';
 export const localTimestampSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/)
@@ -269,3 +265,5 @@ export function validateRange(input: DateRange, maxDays = 3660): DateRange {
   if (days < 1 || days > maxDays) throw new Error(`Date range must contain 1–${maxDays} days`);
   return range;
 }
+
+export * from './coaching.ts';

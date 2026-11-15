@@ -3,7 +3,8 @@
 The app runs as one container on port 8080. Mount a host directory at `/app/data` to keep:
 
 - `db/coach.sqlite` and SQLite WAL/SHM files.
-- `athlete_wiki/`, including pages, revisions and pending proposals.
+- `athlete_wiki/`, including profile pages, revisions, pending proposals, plan versions, acceptance history
+  and dated coaching journal entries. See [coaching storage](coaching-storage.md).
 
 On startup, the entrypoint runs as root, creates the database/wiki directories and recursively
 sets ownership of `/app/data` to UID/GID 1000:1000. It then switches to the `node` user before

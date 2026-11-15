@@ -61,6 +61,7 @@ when merging; check Node/pnpm versions together and run manual image validation 
 ## Documentation
 
 - [Architecture](docs/architecture.md): components, imports and failure handling.
+- [Coaching storage](docs/coaching-storage.md): versioned plans, acceptance and dated journal tools.
 - [Measurements](docs/run-analysis-data.md): what the stored values mean and their limitations.
 - [Storage and deployment](docs/storage.md): Docker, persistence and Nginx Proxy Manager.
 - [Releases](docs/releases.md): Release Please, tags and GHCR setup.

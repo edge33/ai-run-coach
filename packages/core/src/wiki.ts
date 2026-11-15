@@ -1,10 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { type FactInput, factInputSchema, pages, wikiPageSchema } from '@hub/contracts';
 import lockfile from 'proper-lockfile';
 import YAML from 'yaml';
 import { z } from 'zod';
+import { atomicWikiWrite as atomicWrite, readWikiFile as readOptional } from './wiki-files.ts';
 
 function hash(value: unknown) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -34,21 +35,6 @@ export class WikiConflictError extends Error {
   constructor() {
     super('Wiki revision changed. Read the page and review the change again.');
   }
-}
-async function readOptional(path: string): Promise<string | null> {
-  try {
-    const content = await readFile(path, 'utf8');
-    if (content.length > 600000) throw new Error('Wiki page too large');
-    return content;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
-    throw error;
-  }
-}
-async function atomicWrite(path: string, content: string) {
-  const temporary = `${path}.${randomUUID()}.tmp`;
-  await writeFile(temporary, content, { mode: 0o600, flag: 'wx' });
-  await rename(temporary, path);
 }
 export class Wiki {
   readonly path: string;

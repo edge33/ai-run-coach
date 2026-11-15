@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -39,7 +40,7 @@ test('MCP client discovers bounded semantic tools, validates inputs, and never i
   await client.connect(right);
   try {
     const listed = await client.listTools();
-    assert.equal(listed.tools.length, 12);
+    assert.equal(listed.tools.length, 18);
     assert.ok(listed.tools.every((tool) => !['sql', 'fetch', 'sync'].includes(tool.name)));
     const result = await client.callTool({ name: 'get_data_status', arguments: {} });
     const content = result.content as { type: string; text: string }[];
@@ -128,7 +129,7 @@ test('Streamable HTTP initializes, lists and calls tools; validates Origin and m
       payload: { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} },
     });
     assert.equal(tools.statusCode, 200);
-    assert.equal(tools.json().result.tools.length, 12);
+    assert.equal(tools.json().result.tools.length, 18);
     const call = await app.inject({
       method: 'POST',
       url: '/mcp',
@@ -188,5 +189,116 @@ test('native TypeScript stdio process emits only MCP protocol and returns the sa
   } finally {
     await client.close();
     await rm(dir, { recursive: true });
+  }
+});
+
+test('MCP persists draft plans, explicit acceptance and attributed journal entries without syncing', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'hub-coaching-mcp-'));
+  const store = new Store(':memory:');
+  await store.initialize();
+  const server = createMcpServer(store, loadConfig({ WIKI_PATH: join(dir, 'wiki') }));
+  const client = new Client({ name: 'coach-test', version: '1' });
+  const [left, right] = InMemoryTransport.createLinkedPair();
+  await server.connect(left);
+  await client.connect(right);
+  const call = (name: string, args: Record<string, unknown>) =>
+    client.callTool({ name, arguments: args });
+  const decode = (result: Awaited<ReturnType<typeof call>>) =>
+    JSON.parse((result.content as { text: string }[])[0].text);
+  try {
+    const operationId = randomUUID();
+    const draft = {
+      plan_id: 'consistency',
+      operation_id: operationId,
+      expected_version: 0,
+      plan: {
+        start: '2026-11-16',
+        end: '2026-11-22',
+        timezone: 'Europe/Rome',
+        objective: 'Consistent running',
+        context: 'User has three available days',
+        evidence: 'User report on 2026-11-15; no measured history',
+        change_reason: 'Initial plan',
+        sessions: [
+          {
+            id: randomUUID(),
+            date: '2026-11-16',
+            purpose: 'Easy run',
+            duration_s: 1200,
+            distance_m: null,
+            intensity: 'Easy',
+            instructions: 'Run comfortably',
+            alternative: null,
+          },
+        ],
+      },
+    };
+    const saved = await call('save_training_plan', draft);
+    assert.equal(saved.isError, undefined);
+    assert.equal(decode(saved).version, 1);
+    assert.deepEqual(decode(await call('save_training_plan', draft)), decode(saved));
+    let listed = decode(await call('list_training_plans', {}));
+    assert.equal(listed.active, null);
+    const accepted = await call('decide_training_plan', {
+      operation_id: randomUUID(),
+      expected_revision: listed.revision,
+      action: 'accept',
+      target: { plan_id: 'consistency', version: 1 },
+      confirmation: 'User: Yes, follow version 1',
+    });
+    assert.equal(accepted.isError, undefined);
+    listed = decode(await call('list_training_plans', {}));
+    assert.equal(listed.active.version, 1);
+    assert.equal(
+      decode(await call('read_training_plan', { plan_id: 'consistency', version: 1 })).status,
+      'accepted',
+    );
+    const stale = await call('save_training_plan', { ...draft, operation_id: randomUUID() });
+    assert.equal(stale.isError, true);
+    assert.match(JSON.stringify(stale.content), /Plan changed/);
+    const invalid = await call('save_training_plan', {
+      ...draft,
+      operation_id: randomUUID(),
+      expected_version: 1,
+      plan: { ...draft.plan, sessions: [{ ...draft.plan.sessions[0], date: '2026-12-01' }] },
+    });
+    assert.equal(invalid.isError, true);
+    const report = {
+      id: randomUUID(),
+      date: '2026-11-15',
+      kind: 'check_in',
+      author: 'athlete',
+      content: 'Slept poorly last night',
+      source: 'User: Slept poorly last night',
+      applies_until: null,
+      session: { plan_id: 'consistency', session_id: draft.plan.sessions[0].id },
+      activity_id: null,
+      replaces: null,
+    };
+    assert.equal((await call('append_coaching_journal', report)).isError, undefined);
+    const journal = decode(
+      await call('read_coaching_journal', { start: '2026-11-15', end: '2026-11-15' }),
+    );
+    assert.equal(journal.total, 1);
+    assert.equal(journal.items[0].author, 'athlete');
+    assert.equal(
+      (await call('read_coaching_journal', { start: '2026-11-16', end: '2026-11-15' })).isError,
+      true,
+    );
+    assert.equal((await store.syncHistory()).length, 0);
+    const tools = (await client.listTools()).tools;
+    assert.equal(
+      tools.find((tool) => tool.name === 'save_training_plan')?.annotations?.readOnlyHint,
+      false,
+    );
+    assert.equal(
+      tools.find((tool) => tool.name === 'read_coaching_journal')?.annotations?.readOnlyHint,
+      true,
+    );
+  } finally {
+    await client.close();
+    await server.close();
+    await store.close();
+    await rm(dir, { recursive: true, force: true });
   }
 });
