@@ -14,6 +14,22 @@ That directory holds SQLite and the athlete wiki and survives container replacem
 See [Docker, storage and reverse proxy setup](docs/storage.md) for Compose examples and
 [releases](docs/releases.md) for GHCR publishing. The first registry release is still pending.
 
+## Running coach agent
+
+The [`coaching/`](coaching/) folder contains end-user resources for an MCP-connected running
+coach. These are instructions for the athlete's agent, separate from development instructions
+for contributors to this repository.
+
+1. Use the [running coach persona](coaching/agents/running-coach.md) as your agent's role instructions.
+2. Install the complete [`running-coach` skill folder](coaching/skills/running-coach/), including
+   `SKILL.md` and `references/`, through your agent host's skill mechanism.
+3. Connect your agent to your hub's MCP endpoint (or stdio server) with the coaching storage tools
+   available. This repository does not install or activate an agent automatically.
+
+The skill covers goals, availability, training/recovery analysis, plans, check-ins and private wiki
+memory. Saved plans remain drafts until you accept a specific version. Each athlete should use
+their own hub/wiki; keep personal MCP configuration outside Git.
+
 ## Develop locally
 
 Use the Node version in `.nvmrc` and the pnpm version in `package.json`.
