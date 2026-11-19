@@ -269,8 +269,8 @@ importers:
   packages/core:
     dependencies:
       '@garmin/fitsdk':
-        specifier: 21.221.0
-        version: 21.221.0
+        specifier: 21.222.0
+        version: 21.222.0
       '@hub/contracts':
         specifier: workspace:*
         version: link:../contracts
@@ -414,8 +414,8 @@ packages:
   '@fastify/proxy-addr@5.1.2':
     resolution: {integrity: sha512-uqB4QsgVoro0XDC+DIftIMGXHdBPn+lK6Ek3xXAIxPMCJfqxnbtyEoMCm2KPUVOuIosd7Cyw9HawEqMFM/UA+g==}
 
-  '@garmin/fitsdk@21.221.0':
-    resolution: {integrity: sha512-dZiBXPNFowe8VhjHUAoRMFW0sgI6SZaqb3OhOX5UjdLuRmtCoC/bXDJPOObDzyPP68CoEBLv6ueGXayT2tohjw==}
+  '@garmin/fitsdk@21.222.0':
+    resolution: {integrity: sha512-YIo/bPfvENuBKECsAT0wWromTy66Yxw3UqRB1FuAJIs8KMoJCkVPgqnUanFxkZwcAXgIN2qXaeFeRt7rvYlB0g==}
 
   '@hono/node-server@2.1.8':
     resolution: {integrity: sha512-jdf7FHh6A1lzjpHHQUgxsg2GeER2vMetnAOfeActzcoli6jamlK+NAwL6Dsr5Fl3BS3tYUQzCdtZjU8Qxv7bEA==}
@@ -1536,7 +1536,7 @@ snapshots:
       '@fastify/forwarded': 3.1.2
       ipaddr.js: 2.5.0
 
-  '@garmin/fitsdk@21.221.0': {}
+  '@garmin/fitsdk@21.222.0': {}
 
   '@hono/node-server@2.1.8(hono@4.13.18)':
     dependencies:

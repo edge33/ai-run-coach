@@ -18,7 +18,7 @@
     "pino": "10.4.0",
     "yaml": "2.9.1",
     "proper-lockfile": "4.1.2",
-    "@garmin/fitsdk": "21.221.0",
+    "@garmin/fitsdk": "21.222.0",
     "fflate": "0.8.3"
   },
   "devDependencies": {
