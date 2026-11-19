@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/edge33/ai-run-coach/compare/v0.2.0...v0.2.1) (2026-11-19)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @garmin/fitsdk to v21.222.0 ([#41](https://github.com/edge33/ai-run-coach/issues/41)) ([980ab92](https://github.com/edge33/ai-run-coach/commit/980ab9268d5f986fe26e714f0fc0e63d27fa1691))
+* **deps:** update ghcr.io/pnpm/pnpm docker tag to v12.22.0 ([#42](https://github.com/edge33/ai-run-coach/issues/42)) ([5de4566](https://github.com/edge33/ai-run-coach/commit/5de4566edfbb8bf02c96eeb28d43558290a3e7d4))
+
 ## [0.2.0](https://github.com/edge33/ai-run-coach/compare/v0.1.3...v0.2.0) (2026-11-15)
 
 
