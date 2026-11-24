@@ -1,4 +1,4 @@
-FROM node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1 AS base
+FROM node:26.13.1-bookworm-slim@sha256:b822af76043e2656ffc172072036fe0968a3c09a692e4ad05eb9348ad5dbdf4c AS base
 COPY --from=ghcr.io/pnpm/pnpm:12.23.0@sha256:349c846c6c9dab76b2f6fbf4b2df14d5a8c9b2a0fce92fc7e5c2eec3f437e801 /opt/pnpm /opt/pnpm
 RUN ln -s /opt/pnpm/pnpm /usr/local/bin/pnpm
 WORKDIR /app
@@ -16,7 +16,7 @@ RUN pnpm --filter @hub/web build
 FROM base AS production-dependencies
 RUN pnpm install --prod --frozen-lockfile
 
-FROM node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1 AS runtime
+FROM node:26.13.1-bookworm-slim@sha256:b822af76043e2656ffc172072036fe0968a3c09a692e4ad05eb9348ad5dbdf4c AS runtime
 ENV NODE_ENV=production HOST=127.0.0.1 PORT=3000 MCP_PORT=3001 \
     SQLITE_PATH=/app/data/db/coach.sqlite WIKI_PATH=/app/data/athlete_wiki
 RUN apt-get update && apt-get install -y --no-install-recommends nginx tini util-linux && rm -rf /var/lib/apt/lists/*
