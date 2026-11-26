@@ -24,7 +24,7 @@
     "db:init": "node --env-file-if-exists=.env scripts/initialize.ts"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.8",
+    "@biomejs/biome": "2.6.9",
     "@types/node": "26.6.6",
     "turbo": "2.11.13",
     "typescript": "7.0.2"
