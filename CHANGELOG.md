@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.1](https://github.com/edge33/ai-run-coach/compare/v0.2.0...v0.2.1) (2026-11-27)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @garmin/fitsdk to v21.222.0 ([#41](https://github.com/edge33/ai-run-coach/issues/41)) ([980ab92](https://github.com/edge33/ai-run-coach/commit/980ab9268d5f986fe26e714f0fc0e63d27fa1691))
+* **deps:** update dependency @tanstack/react-query to v5.108.4 ([#39](https://github.com/edge33/ai-run-coach/issues/39)) ([d8f1ff9](https://github.com/edge33/ai-run-coach/commit/d8f1ff948bc7a8d9598559b55a7f292cd3d5b022))
+* **deps:** update ghcr.io/pnpm/pnpm docker tag to v12.22.0 ([#42](https://github.com/edge33/ai-run-coach/issues/42)) ([5de4566](https://github.com/edge33/ai-run-coach/commit/5de4566edfbb8bf02c96eeb28d43558290a3e7d4))
+* **deps:** update ghcr.io/pnpm/pnpm docker tag to v12.23.0 ([#44](https://github.com/edge33/ai-run-coach/issues/44)) ([8e0699b](https://github.com/edge33/ai-run-coach/commit/8e0699ba15295134e312fceee6aa00001558657a))
+* **deps:** update ghcr.io/pnpm/pnpm docker tag to v12.24.0 ([#53](https://github.com/edge33/ai-run-coach/issues/53)) ([5706dc0](https://github.com/edge33/ai-run-coach/commit/5706dc0abb19b6efef52ead2677a094d2dd9f911))
+* **deps:** update node.js to 0042e17 ([#48](https://github.com/edge33/ai-run-coach/issues/48)) ([fe74865](https://github.com/edge33/ai-run-coach/commit/fe74865fea93d99be59c531274aaf3097cba90db))
+* **deps:** update node.js to b822af7 ([#47](https://github.com/edge33/ai-run-coach/issues/47)) ([2146ff9](https://github.com/edge33/ai-run-coach/commit/2146ff956f3e0d9dd753f9578234d644f0a17847))
+
 ## [0.2.0](https://github.com/edge33/ai-run-coach/compare/v0.1.3...v0.2.0) (2026-11-15)
 
 
