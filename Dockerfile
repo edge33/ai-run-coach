@@ -1,5 +1,5 @@
 FROM node:26.13.1-bookworm-slim@sha256:0042e17d232a87a2cd485be1da7900fca4d10a4ad11b29e9285da1d2e54798c9 AS base
-COPY --from=ghcr.io/pnpm/pnpm:12.23.0@sha256:349c846c6c9dab76b2f6fbf4b2df14d5a8c9b2a0fce92fc7e5c2eec3f437e801 /opt/pnpm /opt/pnpm
+COPY --from=ghcr.io/pnpm/pnpm:12.24.0@sha256:4f92e7dc6a1f6c3475c5fc7c4fdd22818e61adb59c75bef9e87aa0a6bf7cd61f /opt/pnpm /opt/pnpm
 RUN ln -s /opt/pnpm/pnpm /usr/local/bin/pnpm
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
